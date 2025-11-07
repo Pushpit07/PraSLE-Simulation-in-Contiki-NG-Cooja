@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Test script to verify the bully algorithm implementation compiles correctly
-# Usage: ./test-build.sh
+# Build script to compile the bully algorithm for Cooja simulation
+# Usage: ./build.sh
 
-echo "Testing Bully Leader Election Algorithm Build..."
+echo "Building Bully Leader Election Algorithm..."
 echo "=============================================="
 
 # Navigate to the bully directory
@@ -14,7 +14,7 @@ echo "Files in directory:"
 ls -la
 
 echo ""
-echo "Testing compilation for Cooja target..."
+echo "Compiling for Cooja target..."
 make clean
 make bully-node.cooja TARGET=cooja
 
@@ -28,8 +28,6 @@ if [ $? -eq 0 ]; then
     echo "2. Open simulation: File → Open Simulation → bully-cooja.csc"
     echo "3. Start simulation and observe the election process"
     echo ""
-    echo "Generated files:"
-    ls -la *.cooja 2>/dev/null || echo "No .cooja files found"
 else
     echo ""
     echo "❌ BUILD FAILED!"

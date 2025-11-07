@@ -1,31 +1,21 @@
 /*
- * Copyright (c) 2024, TU Dresden
- * All rights reserved.
- *
  * Project configuration for Bully Leader Election Algorithm
  */
 
 #ifndef PROJECT_CONF_H_
 #define PROJECT_CONF_H_
 
-/* Enable nullnet for simple message passing */
-#define NULLNET_CONF_SIZE 128
+/* Enable IPv6 with RPL routing for multi-hop communication */
+#define NETSTACK_CONF_WITH_IPV6 1
+#define UIP_CONF_ROUTER 1
 
-/* Completely disable IPv6 stack */
-#define UIP_CONF_IPV6 0
-#define NETSTACK_CONF_WITH_IPV6 0
-
-/* Disable all routing */
-#define UIP_CONF_ROUTER 0
-#define NETSTACK_CONF_WITH_ROUTING 0
-
-/* Disable TCP/IP */
+/* TCP not needed for our UDP-based protocol */
 #define UIP_CONF_TCP 0
 
-/* Enable logging */
-#define LOG_CONF_LEVEL_MAIN LOG_LEVEL_INFO
+/* Optional: cap app payload size */
+#define PACKETBUF_CONF_SIZE 128
 
-/* Energy configuration */
-#define ENERGEST_CONF_ON 1
+/* Logging */
+#define LOG_CONF_LEVEL_MAIN LOG_LEVEL_INFO
 
 #endif /* PROJECT_CONF_H_ */
