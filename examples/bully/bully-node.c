@@ -153,6 +153,27 @@
 #define UDP_PORT 8765
 
 /*---------------------------------------------------------------------------*/
+/* METRICS COLLECTION CONFIGURATION */
+/*---------------------------------------------------------------------------*/
+/**
+ * ENABLE_METRICS: Enable detailed metrics collection and CSV output
+ * - Set to 1 to enable metrics tracking (for experiments and evaluation)
+ * - Set to 0 to disable (for production deployment, saves memory)
+ * - When enabled, metrics are periodically output in CSV format
+ */
+#ifndef ENABLE_METRICS
+#define ENABLE_METRICS 1
+#endif
+
+/**
+ * METRICS_OUTPUT_INTERVAL: How often to output metrics (in seconds)
+ * - Only used when ENABLE_METRICS = 1
+ * - Lower values = more frequent output = more granular data
+ * - Higher values = less frequent output = lower overhead
+ */
+#define METRICS_OUTPUT_INTERVAL (10 * CLOCK_SECOND)
+
+/*---------------------------------------------------------------------------*/
 /* NODE STATE MACHINE */
 /*---------------------------------------------------------------------------*/
 /**
@@ -217,6 +238,72 @@ typedef struct {
   uint16_t target_id;    /* Target node (0=broadcast) */
   uint16_t sequence;     /* Sequence number for duplicate detection */
 } bully_msg_t;
+
+/*---------------------------------------------------------------------------*/
+/* METRICS STRUCTURE */
+/*---------------------------------------------------------------------------*/
+#if ENABLE_METRICS
+/**
+ * Comprehensive metrics tracking for Bully algorithm evaluation.
+ * These metrics align with the evaluation criteria in the thesis expose:
+ * - Convergence time
+ * - Communication overhead
+ * - Election stability
+ * - Energy efficiency
+ * - Fault tolerance
+ */
+typedef struct {
+  /* Election Metrics */
+  uint32_t elections_started;          /* Total elections initiated by this node */
+  uint32_t elections_won;               /* Elections won by this node (became coordinator) */
+  uint32_t elections_lost;              /* Elections lost (received ANSWER) */
+  clock_time_t last_election_start;    /* Timestamp of last election start */
+  clock_time_t last_election_end;      /* Timestamp of last election end */
+  clock_time_t total_election_time;    /* Cumulative time spent in election state */
+  clock_time_t first_convergence_time; /* Time to first coordinator (cold start) */
+  bool first_convergence_recorded;     /* Flag for first convergence */
+
+  /* Message Metrics */
+  uint32_t msg_election_sent;          /* ELECTION messages sent */
+  uint32_t msg_election_recv;          /* ELECTION messages received */
+  uint32_t msg_answer_sent;            /* ANSWER messages sent */
+  uint32_t msg_answer_recv;            /* ANSWER messages received */
+  uint32_t msg_coordinator_sent;       /* COORDINATOR messages sent */
+  uint32_t msg_coordinator_recv;       /* COORDINATOR messages received */
+  uint32_t msg_alive_sent;             /* ALIVE messages sent */
+  uint32_t msg_alive_recv;             /* ALIVE messages received */
+  uint32_t duplicates_filtered;        /* Duplicate messages filtered */
+
+  /* Leader Metrics */
+  uint32_t leader_changes;             /* Number of times coordinator changed */
+  uint16_t previous_leader;            /* Previous coordinator ID */
+  clock_time_t leader_tenure_start;   /* When current leader started */
+  clock_time_t total_time_as_leader;  /* Cumulative time as coordinator */
+
+  /* State Metrics */
+  uint32_t state_transitions;          /* Total state transitions */
+  clock_time_t time_in_normal;         /* Time in STATE_NORMAL */
+  clock_time_t time_in_election;       /* Time in STATE_ELECTION */
+  clock_time_t time_in_waiting;        /* Time in STATE_WAITING_COORDINATOR */
+  clock_time_t last_state_change;      /* Timestamp of last state change */
+  bully_state_t last_state;            /* Previous state for tracking */
+
+  /* Fault Detection Metrics */
+  uint32_t coordinator_timeouts;       /* Times coordinator timeout fired */
+  uint32_t alive_resets;               /* Times ALIVE reset coordinator timer */
+
+  /* Partition Healing Metrics */
+  uint32_t coordinator_reannouncements; /* Times coordinator re-announced */
+  uint32_t alive_adoptions;             /* Times adopted coordinator via ALIVE */
+
+  /* Invalid Events */
+  uint32_t invalid_coordinators;       /* Rejected coordinators (lower priority) */
+  uint32_t unknown_messages;           /* Unknown message types received */
+} metrics_t;
+
+/* Global metrics instance */
+static metrics_t metrics = {0};
+#endif /* ENABLE_METRICS */
 
 /*---------------------------------------------------------------------------*/
 /* GLOBAL STATE VARIABLES */
@@ -303,6 +390,15 @@ static struct etimer coordinator_timer;
  */
 static struct etimer alive_timer;
 
+#if ENABLE_METRICS
+/**
+ * metrics_timer: Fires after METRICS_OUTPUT_INTERVAL
+ * - Purpose: Periodic output of metrics in CSV format
+ * - Active: Always running when metrics are enabled
+ */
+static struct etimer metrics_timer;
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* DUPLICATE MESSAGE DETECTION */
 /*---------------------------------------------------------------------------*/
@@ -341,6 +437,168 @@ static bool is_duplicate_message(uint16_t sender_id, uint16_t sequence);
 static void broadcast_message(uint8_t msg_type, uint16_t sequence);
 static void start_election(void);
 static void handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src);
+
+#if ENABLE_METRICS
+static void output_metrics_header(void);
+static void output_metrics(void);
+static void track_state_transition(bully_state_t new_state);
+#endif
+
+/*===========================================================================*/
+/*                      METRICS COLLECTION FUNCTIONS                         */
+/*===========================================================================*/
+
+#if ENABLE_METRICS
+/**
+ * \brief Output CSV header for metrics
+ *
+ * This is called once at startup to output column names.
+ * Format: CSV with fields matching the metrics structure.
+ */
+static void
+output_metrics_header(void)
+{
+  printf("METRICS_HEADER,");
+  printf("timestamp,node_id,");
+  printf("elections_started,elections_won,elections_lost,");
+  printf("total_election_time,first_convergence_time,");
+  printf("msg_election_sent,msg_election_recv,");
+  printf("msg_answer_sent,msg_answer_recv,");
+  printf("msg_coordinator_sent,msg_coordinator_recv,");
+  printf("msg_alive_sent,msg_alive_recv,");
+  printf("duplicates_filtered,");
+  printf("leader_changes,current_leader,");
+  printf("total_time_as_leader,");
+  printf("state_transitions,");
+  printf("time_in_normal,time_in_election,time_in_waiting,");
+  printf("coordinator_timeouts,alive_resets,");
+  printf("coordinator_reannouncements,alive_adoptions,");
+  printf("invalid_coordinators,unknown_messages");
+  printf("\n");
+}
+
+/**
+ * \brief Output current metrics in CSV format
+ *
+ * Called periodically to output metrics snapshot.
+ * Format: CSV row matching header columns.
+ */
+static void
+output_metrics(void)
+{
+  clock_time_t now = clock_time();
+
+  /* Update time-in-state metrics before outputting */
+  clock_time_t elapsed_since_state_change = now - metrics.last_state_change;
+  switch (state) {
+    case STATE_NORMAL:
+      metrics.time_in_normal += elapsed_since_state_change;
+      break;
+    case STATE_ELECTION:
+      metrics.time_in_election += elapsed_since_state_change;
+      break;
+    case STATE_WAITING_COORDINATOR:
+      metrics.time_in_waiting += elapsed_since_state_change;
+      break;
+  }
+  metrics.last_state_change = now;
+
+  /* Update leader tenure if we're currently the leader */
+  if (current_leader == my_node_id && metrics.leader_tenure_start > 0) {
+    metrics.total_time_as_leader += (now - metrics.leader_tenure_start);
+    metrics.leader_tenure_start = now;
+  }
+
+  /* Output CSV row */
+  printf("METRICS,");
+  printf("%lu,%u,", (unsigned long)now, my_node_id);
+  printf("%lu,%lu,%lu,",
+         (unsigned long)metrics.elections_started,
+         (unsigned long)metrics.elections_won,
+         (unsigned long)metrics.elections_lost);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.total_election_time,
+         (unsigned long)metrics.first_convergence_time);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.msg_election_sent,
+         (unsigned long)metrics.msg_election_recv);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.msg_answer_sent,
+         (unsigned long)metrics.msg_answer_recv);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.msg_coordinator_sent,
+         (unsigned long)metrics.msg_coordinator_recv);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.msg_alive_sent,
+         (unsigned long)metrics.msg_alive_recv);
+  printf("%lu,", (unsigned long)metrics.duplicates_filtered);
+  printf("%lu,%u,",
+         (unsigned long)metrics.leader_changes,
+         current_leader);
+  printf("%lu,",
+         (unsigned long)metrics.total_time_as_leader);
+  printf("%lu,",
+         (unsigned long)metrics.state_transitions);
+  printf("%lu,%lu,%lu,",
+         (unsigned long)metrics.time_in_normal,
+         (unsigned long)metrics.time_in_election,
+         (unsigned long)metrics.time_in_waiting);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.coordinator_timeouts,
+         (unsigned long)metrics.alive_resets);
+  printf("%lu,%lu,",
+         (unsigned long)metrics.coordinator_reannouncements,
+         (unsigned long)metrics.alive_adoptions);
+  printf("%lu,%lu",
+         (unsigned long)metrics.invalid_coordinators,
+         (unsigned long)metrics.unknown_messages);
+  printf("\n");
+}
+
+/**
+ * \brief Track state transitions and update metrics
+ *
+ * \param new_state The new state being transitioned to
+ *
+ * This function updates state timing metrics and tracks transitions.
+ */
+static void
+track_state_transition(bully_state_t new_state)
+{
+  if (new_state == state) {
+    return; /* No transition */
+  }
+
+  clock_time_t now = clock_time();
+  clock_time_t elapsed = now - metrics.last_state_change;
+
+  /* Update time spent in previous state */
+  switch (metrics.last_state) {
+    case STATE_NORMAL:
+      metrics.time_in_normal += elapsed;
+      break;
+    case STATE_ELECTION:
+      metrics.time_in_election += elapsed;
+      /* Record election end time */
+      metrics.last_election_end = now;
+      metrics.total_election_time += (now - metrics.last_election_start);
+      break;
+    case STATE_WAITING_COORDINATOR:
+      metrics.time_in_waiting += elapsed;
+      break;
+  }
+
+  /* Track transition */
+  metrics.state_transitions++;
+  metrics.last_state = state;
+  metrics.last_state_change = now;
+
+  /* If transitioning to ELECTION, record start time */
+  if (new_state == STATE_ELECTION) {
+    metrics.last_election_start = now;
+  }
+}
+#endif /* ENABLE_METRICS */
 
 /*===========================================================================*/
 /*                      MESSAGE HANDLING FUNCTIONS                           */
@@ -382,6 +640,24 @@ send_message(uint8_t msg_type, uint16_t target_id, uint16_t sequence)
            msg_type == MSG_ANSWER ? "ANSWER" :
            msg_type == MSG_COORDINATOR ? "COORDINATOR" : "ALIVE",
            target_id);
+
+#if ENABLE_METRICS
+  /* Track sent messages */
+  switch (msg_type) {
+    case MSG_ELECTION:
+      metrics.msg_election_sent++;
+      break;
+    case MSG_ANSWER:
+      metrics.msg_answer_sent++;
+      break;
+    case MSG_COORDINATOR:
+      metrics.msg_coordinator_sent++;
+      break;
+    case MSG_ALIVE:
+      metrics.msg_alive_sent++;
+      break;
+  }
+#endif
 
   /* Send via UDP to link-local all-nodes multicast address */
   /* Link-local multicast (ff02::1) only reaches direct neighbors (single-hop) */
@@ -470,6 +746,21 @@ broadcast_message(uint8_t msg_type, uint16_t sequence)
            msg_type == MSG_ELECTION ? "ELECTION" :
            msg_type == MSG_COORDINATOR ? "COORDINATOR" : "ALIVE");
 
+#if ENABLE_METRICS
+  /* Track sent messages */
+  switch (msg_type) {
+    case MSG_ELECTION:
+      metrics.msg_election_sent++;
+      break;
+    case MSG_COORDINATOR:
+      metrics.msg_coordinator_sent++;
+      break;
+    case MSG_ALIVE:
+      metrics.msg_alive_sent++;
+      break;
+  }
+#endif
+
   /* Send via UDP to link-local all-nodes multicast address */
   /* Link-local multicast (ff02::1) only reaches direct neighbors (single-hop) */
   uip_ipaddr_t dest_addr;
@@ -508,6 +799,15 @@ start_election(void)
 
   /* Log election start with sequence number */
   LOG_INFO("Starting election (sequence %u)\n", election_sequence + 1);
+
+#if ENABLE_METRICS
+  /* Track state transition before changing state */
+  track_state_transition(STATE_ELECTION);
+
+  /* Track election start */
+  metrics.elections_started++;
+  metrics.last_election_start = clock_time();
+#endif
 
   /* Update state and election tracking */
   state = STATE_ELECTION;
@@ -592,8 +892,29 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
       is_duplicate_message(sender_id, msg->sequence)) {
     LOG_INFO("Ignoring duplicate message from node %u (seq %u)\n",
              sender_id, msg->sequence);
+#if ENABLE_METRICS
+    metrics.duplicates_filtered++;
+#endif
     return;
   }
+
+#if ENABLE_METRICS
+  /* Track received messages by type */
+  switch (msg->type) {
+    case MSG_ELECTION:
+      metrics.msg_election_recv++;
+      break;
+    case MSG_ANSWER:
+      metrics.msg_answer_recv++;
+      break;
+    case MSG_COORDINATOR:
+      metrics.msg_coordinator_recv++;
+      break;
+    case MSG_ALIVE:
+      metrics.msg_alive_recv++;
+      break;
+  }
+#endif
 
   /* 4. PROCESS MESSAGE BASED ON TYPE */
   switch (msg->type) {
@@ -648,6 +969,9 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
            * waiting for coordinator_timer to expire (saves 20 seconds). */
           if (current_leader == my_node_id) {
             LOG_INFO("Re-announcing coordinator status to help partition healing\n");
+#if ENABLE_METRICS
+            metrics.coordinator_reannouncements++;
+#endif
             broadcast_message(MSG_COORDINATOR, election_sequence);
           }
 
@@ -690,6 +1014,13 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
       if (msg->target_id == my_node_id && state == STATE_ELECTION) {
         election_response_received = true;
         LOG_INFO("Received ANSWER from node %u, backing down from election\n", sender_id);
+
+#if ENABLE_METRICS
+        /* Track election lost */
+        metrics.elections_lost++;
+        /* Track state transition */
+        track_state_transition(STATE_WAITING_COORDINATOR);
+#endif
 
         /* Transition state */
         state = STATE_WAITING_COORDINATOR;
@@ -738,6 +1069,30 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
       if (sender_id >= my_node_id) {
         /* Valid coordinator - accept */
         LOG_INFO("New coordinator: node %u\n", sender_id);
+
+#if ENABLE_METRICS
+        /* Track leader change */
+        if (current_leader != sender_id) {
+          metrics.leader_changes++;
+          metrics.previous_leader = current_leader;
+
+          /* Stop tracking tenure for old leader if we were the leader */
+          if (current_leader == my_node_id && metrics.leader_tenure_start > 0) {
+            metrics.total_time_as_leader += (clock_time() - metrics.leader_tenure_start);
+            metrics.leader_tenure_start = 0;
+          }
+
+          /* Record first convergence time (cold start) */
+          if (!metrics.first_convergence_recorded && current_leader == 0) {
+            metrics.first_convergence_time = clock_time();
+            metrics.first_convergence_recorded = true;
+          }
+        }
+
+        /* Track state transition */
+        track_state_transition(STATE_NORMAL);
+#endif
+
         current_leader = sender_id;
         state = STATE_NORMAL;
 
@@ -748,6 +1103,10 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
       } else {
         /* Invalid coordinator - they have lower priority than us! */
         LOG_WARN("Rejecting coordinator %u (lower priority than me)\n", sender_id);
+
+#if ENABLE_METRICS
+        metrics.invalid_coordinators++;
+#endif
 
         /* Start election if not already in progress */
         if (state != STATE_ELECTION) {
@@ -831,6 +1190,24 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
            state == STATE_WAITING_COORDINATOR ||
            sender_id > current_leader)) {
         LOG_INFO("Adopting node %u as coordinator (discovered via ALIVE)\n", sender_id);
+
+#if ENABLE_METRICS
+        metrics.alive_adoptions++;
+        /* Track leader change */
+        if (current_leader != sender_id) {
+          metrics.leader_changes++;
+          metrics.previous_leader = current_leader;
+
+          /* Record first convergence if applicable */
+          if (!metrics.first_convergence_recorded && current_leader == 0) {
+            metrics.first_convergence_time = clock_time();
+            metrics.first_convergence_recorded = true;
+          }
+        }
+        /* Track state transition */
+        track_state_transition(STATE_NORMAL);
+#endif
+
         current_leader = sender_id;
         state = STATE_NORMAL;
         /* Reset coordinator timer to start monitoring the new leader */
@@ -839,6 +1216,10 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
       /* STANDARD BEHAVIOR: Reset timer for current leader */
       else if (sender_id == current_leader) {
         LOG_INFO("Leader %u is alive\n", sender_id);
+
+#if ENABLE_METRICS
+        metrics.alive_resets++;
+#endif
 
         /* Reset coordinator timeout timer */
         /* This is the core of the failure detection mechanism */
@@ -852,6 +1233,9 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
     default:
       /* Unknown message type - log and ignore */
       LOG_WARN("Unknown message type: %u\n", msg->type);
+#if ENABLE_METRICS
+      metrics.unknown_messages++;
+#endif
       break;
   }
 }
@@ -924,6 +1308,16 @@ PROCESS_THREAD(bully_process, ev, data)
   simple_udp_register(&udp_conn, UDP_PORT, NULL, UDP_PORT, udp_rx_callback);
   LOG_INFO("UDP connection registered on port %d\n", UDP_PORT);
 
+#if ENABLE_METRICS
+  /* Initialize metrics */
+  memset(&metrics, 0, sizeof(metrics));
+  metrics.last_state_change = clock_time();
+  metrics.last_state = STATE_NORMAL;
+
+  /* Output CSV header */
+  output_metrics_header();
+#endif
+
   /*
    * RANDOM STARTUP DELAY
    *
@@ -956,6 +1350,11 @@ PROCESS_THREAD(bully_process, ev, data)
 
   /* Start alive timer (will only send when we're coordinator) */
   etimer_set(&alive_timer, ALIVE_INTERVAL);
+
+#if ENABLE_METRICS
+  /* Start metrics output timer */
+  etimer_set(&metrics_timer, METRICS_OUTPUT_INTERVAL);
+#endif
 
   /*=========================================================================*/
   /* MAIN EVENT LOOP */
@@ -1005,6 +1404,29 @@ PROCESS_THREAD(bully_process, ev, data)
           if (!election_response_received) {
             /* CASE 1: WE WON THE ELECTION */
             LOG_INFO("No responses received, becoming coordinator\n");
+
+#if ENABLE_METRICS
+            /* Track election won */
+            metrics.elections_won++;
+
+            /* Track leader change (we became leader) */
+            if (current_leader != my_node_id) {
+              metrics.leader_changes++;
+              metrics.previous_leader = current_leader;
+
+              /* Start tracking our tenure as leader */
+              metrics.leader_tenure_start = clock_time();
+
+              /* Record first convergence if this is initial election */
+              if (!metrics.first_convergence_recorded && current_leader == 0) {
+                metrics.first_convergence_time = clock_time();
+                metrics.first_convergence_recorded = true;
+              }
+            }
+
+            /* Track state transition */
+            track_state_transition(STATE_NORMAL);
+#endif
 
             /* Update our role */
             current_leader = my_node_id;
@@ -1060,6 +1482,9 @@ PROCESS_THREAD(bully_process, ev, data)
         /* SCENARIO 1 & 2: Waiting for coordinator or no leader known */
         if (state == STATE_WAITING_COORDINATOR || current_leader == 0) {
           LOG_INFO("No coordinator announcement received, starting new election\n");
+#if ENABLE_METRICS
+          metrics.coordinator_timeouts++;
+#endif
           start_election();
           etimer_set(&election_timer, ELECTION_TIMEOUT);
         }
@@ -1067,6 +1492,10 @@ PROCESS_THREAD(bully_process, ev, data)
         else if (current_leader != my_node_id) {
           LOG_INFO("Coordinator %u timeout - no ALIVE received, starting election\n",
                    current_leader);
+
+#if ENABLE_METRICS
+          metrics.coordinator_timeouts++;
+#endif
 
           /* Clear dead leader */
           current_leader = 0;
@@ -1106,6 +1535,24 @@ PROCESS_THREAD(bully_process, ev, data)
         /* This creates periodic ALIVE messages every ALIVE_INTERVAL */
         etimer_reset(&alive_timer);
       }
+
+#if ENABLE_METRICS
+      /*---------------------------------------------------------------------*/
+      /* METRICS TIMER EXPIRED */
+      /*---------------------------------------------------------------------*/
+      else if (data == &metrics_timer) {
+        /*
+         * TIME TO OUTPUT METRICS
+         *
+         * Output current metrics snapshot in CSV format to console.
+         * This data will be captured by the experiment automation scripts.
+         */
+        output_metrics();
+
+        /* Reset timer for next output */
+        etimer_reset(&metrics_timer);
+      }
+#endif
     }
     /* Messages are handled via udp_rx_callback → handle_message() */
   }

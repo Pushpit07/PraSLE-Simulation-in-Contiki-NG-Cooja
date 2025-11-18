@@ -640,9 +640,145 @@ Keep the current implementation where:
 - Suitable for networks where partitions are expected
 - Lower complexity and overhead
 
+## Running Experiments and Collecting Metrics
+
+This implementation includes comprehensive metrics collection for evaluating leader election performance. The system is fully automated with headless Cooja execution and automatic metrics collection.
+
+### Prerequisites
+
+1. **Build Cooja** (one-time setup):
+   ```bash
+   cd /path/to/contiki-ng/tools/cooja
+   ./gradlew jar
+   ```
+
+2. **Build the Bully algorithm**:
+   ```bash
+   cd examples/bully
+   make TARGET=cooja
+   ```
+
+### Running Your First Experiment
+
+**Simple way** (using the wrapper script):
+
+```bash
+cd examples/bully
+
+# Run with defaults (60s, auto-generated output name)
+./create-metrics.sh
+
+# Run 5-minute experiment
+./create-metrics.sh 300
+
+# Run with custom name
+./create-metrics.sh 60 my_first_test
+```
+
+**Advanced way** (direct Python invocation):
+
+```bash
+cd examples/bully/scripts
+
+# Full control over all parameters
+python3 run_experiment.py \
+    --simulation ../bully-cooja.csc \
+    --duration 60 \
+    --output ../results/my_first_test
+```
+
+This will:
+1. ✅ Run Cooja simulation in headless mode for specified duration
+2. ✅ Capture all metrics output from the 6 nodes
+3. ✅ Extract metrics to `results/<name>/metrics.csv`
+4. ✅ Generate summary statistics in `results/<name>/summary.txt`
+
+### Viewing Results
+
+The script shows you the output location. To view results:
+
+```bash
+# View summary statistics
+cat results/my_first_test/summary.txt
+
+# View metrics CSV
+cat results/my_first_test/metrics.csv
+
+# View raw Cooja output (for debugging)
+cat results/my_first_test/cooja_output.log
+```
+
+**Tip**: If you used the default (no custom name), look for the timestamped directory in `results/test_YYYYMMDD_HHMMSS/`
+
+### Running Multiple Scenarios
+
+Execute all baseline scenarios (5min, 15min, 30min):
+
+```bash
+cd scripts
+./run_scenarios.sh ../results/baseline_$(date +%Y%m%d)
+```
+
+This runs:
+1. **Scenario 1**: Cold start election (5 min)
+2. **Scenario 2**: Extended stability test (15 min)
+3. **Scenario 3**: Long-term monitoring (30 min)
+
+Each scenario produces metrics CSV, analysis files, and visualization plots.
+
+### Analysis and Visualization
+
+Analyze collected metrics:
+
+```bash
+# Generate summary statistics
+python3 parse_metrics.py ../results/test/metrics.csv --summary
+
+# Create visualization plots
+python3 plot_results.py ../results/test/metrics.csv \
+    --output ../results/test/plots
+```
+
+### Metrics Collected
+
+The implementation tracks 30+ metrics including:
+
+- **Convergence**: Time to first leader election
+- **Elections**: Started, won, lost per node
+- **Messages**: ELECTION, ANSWER, COORDINATOR, ALIVE counts (sent & received)
+- **Leadership**: Leader changes, time as leader
+- **State distribution**: Time in NORMAL, ELECTION, WAITING states
+- **Fault tolerance**: Coordinator timeouts, partition healing events
+
+All metrics are output periodically in CSV format for analysis.
+
+### Network Configuration
+
+- **6 nodes** in a 2x3 grid topology
+- **Range**: 100m transmission/interference range
+- **Leader**: Node with highest ID (Node 6)
+- **Protocol**: IPv6 with RPL Lite routing
+
+### Next Steps
+
+1. **Run baseline experiments** to collect Bully algorithm metrics
+2. **Implement PraSLE** algorithm for comparison
+3. **Compare** convergence time, message overhead, stability
+4. **Extend PraSLE** with energy-awareness, link-quality, adaptive timeouts
+
+### Detailed Documentation
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) for complete documentation on:
+- Detailed metrics definitions (30+ metrics)
+- Experimental design methodology
+- Statistical analysis procedures
+- Visualization options
+- Troubleshooting guide
+
 ## References
 
 - Original Bully Algorithm: Garcia-Molina, H. (1982). "Elections in a Distributed Computing System"
 - Contiki-NG Documentation: https://github.com/contiki-ng/contiki-ng
 - Cooja Simulator Guide: Contiki-NG Wiki
 - RPL Lite Documentation: Contiki-NG routing documentation
+- Thesis Exposé: See Section 6 for evaluation methodology

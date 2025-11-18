@@ -210,4 +210,49 @@
     <location_x>0</location_x>
     <location_y>403</location_y>
   </plugin>
+  <plugin>
+    org.contikios.cooja.plugins.ScriptRunner
+    <plugin_config>
+      <script>/* Bully Algorithm Headless Execution Script */
+
+// Read duration from environment or use default (5 minutes = 300000ms)
+var duration = java.lang.System.getenv("COOJA_TIMEOUT");
+if (duration == null) {
+  duration = 300000;
+} else {
+  duration = parseInt(duration);
+}
+
+java.lang.System.out.println("===== SCRIPT STARTED =====");
+java.lang.System.out.println("Duration: " + duration + "ms");
+java.lang.System.out.println("Motes: " + sim.getMotesCount());
+
+// Schedule simulation end message
+GENERATE_MSG(duration, "sim_end");
+
+/* Listen to all mote output and forward to stdout */
+var msgCount = 0;
+while(true) {
+  YIELD();
+
+  msgCount++;
+
+  // Check for simulation end
+  if (msg.equals("sim_end")) {
+    java.lang.System.out.println("===== SIMULATION END =====");
+    java.lang.System.out.println("Messages received: " + msgCount);
+    log.testOK();
+  }
+
+  // Forward mote output to stdout
+  java.lang.System.out.println(time + " " + id + " " + msg);
+}</script>
+      <active>true</active>
+    </plugin_config>
+    <width>600</width>
+    <z>3</z>
+    <height>700</height>
+    <location_x>700</location_x>
+    <location_y>0</location_y>
+  </plugin>
 </simconf>
