@@ -689,9 +689,25 @@ python3 run_experiment.py \
 
 This will:
 1. ✅ Run Cooja simulation in headless mode for specified duration
-2. ✅ Capture all metrics output from the 6 nodes
+2. ✅ Capture all metrics output from the nodes
 3. ✅ Extract metrics to `results/<name>/metrics.csv`
 4. ✅ Generate summary statistics in `results/<name>/summary.txt`
+
+**Note**: The examples above use the default `bully-cooja.csc` (6 nodes). For scalability experiments, use the multi-node CSC files:
+- `bully-cooja-5nodes.csc` - 5 nodes
+- `bully-cooja-10nodes.csc` - 10 nodes
+- `bully-cooja-50nodes.csc` - 50 nodes
+- `bully-cooja-100nodes.csc` - 100 nodes
+
+Example with different node counts:
+```bash
+# Run with 100 nodes
+cd examples/bully/scripts
+python3 run_experiment.py \
+    --simulation ../bully-cooja-100nodes.csc \
+    --duration 300 \
+    --output ../results/test_100nodes
+```
 
 ### Viewing Results
 
@@ -712,19 +728,27 @@ cat results/my_first_test/cooja_output.log
 
 ### Running Multiple Scenarios
 
-Execute all baseline scenarios (5min, 15min, 30min):
+Execute the complete multi-node experiment suite:
 
 ```bash
-cd scripts
-./run_scenarios.sh ../results/baseline_$(date +%Y%m%d)
+cd examples/bully
+./run_scenarios.sh
 ```
 
-This runs:
-1. **Scenario 1**: Cold start election (5 min)
-2. **Scenario 2**: Extended stability test (15 min)
-3. **Scenario 3**: Long-term monitoring (30 min)
+This runs **12 experiments** across different network sizes and durations:
 
-Each scenario produces metrics CSV, analysis files, and visualization plots.
+**Node Counts**: 5, 10, 50, 100 nodes
+**Durations**: 5 min, 15 min, 30 min
+
+**Experiment Matrix** (4 × 3 = 12 experiments):
+- 5 nodes: 5min, 15min, 30min
+- 10 nodes: 5min, 15min, 30min
+- 50 nodes: 5min, 15min, 30min
+- 100 nodes: 5min, 15min, 30min
+
+Each experiment produces metrics CSV, analysis files, and visualization plots.
+
+**Results location**: `results/baseline_YYYYMMDD_HHMMSS/`
 
 ### Analysis and Visualization
 
@@ -738,6 +762,51 @@ python3 parse_metrics.py ../results/test/metrics.csv --summary
 python3 plot_results.py ../results/test/metrics.csv \
     --output ../results/test/plots
 ```
+
+### Statistical Analysis: Convergence Time Trials
+
+For rigorous statistical analysis of convergence time, run multiple trials and analyze the distribution:
+
+```bash
+cd examples/bully
+
+# Run 100 trials with 50 nodes (60s each, auto-detects CPU cores for parallel execution)
+./experiments/convergence/run_convergence_trials.sh 50
+
+# Run 200 trials with 100 nodes (parallel execution)
+./experiments/convergence/run_convergence_trials.sh 100 200
+
+# Run with specific number of parallel jobs (e.g., 4)
+./experiments/convergence/run_convergence_trials.sh 50 100 60 4
+
+# Visualize the distribution (auto-detects most recent trials)
+./experiments/convergence/create-convergence-plot.sh
+
+# Or specify a specific trials directory
+# ./experiments/convergence/create-convergence-plot.sh results/convergence_trials/50nodes_20251201_123456
+
+# Or use the Python script directly for advanced options
+# python3 scripts/plot_convergence_distribution.py \
+#     -i results/convergence_trials/50nodes_20251201_123456/convergence_times.csv \
+#     -o convergence_50nodes.png
+```
+
+This will:
+1. **Run trials in parallel** (auto-detects CPU cores, or specify manually)
+   - Significantly reduces total time (e.g., 8 cores: ~116 min → ~15 min for 100 trials)
+2. Collect only convergence time with unique random seed per trial
+3. Save all measurements to CSV: `results/convergence_trials/{nodes}nodes_YYYYMMDD_HHMMSS/convergence_times.csv`
+4. Generate plot showing:
+   - Individual measurements (scatter points)
+   - Mean (dashed line)
+   - ±1σ standard deviation (shaded region)
+   - Summary statistics box
+
+**Use this for**:
+- Statistical validation of convergence time
+- Comparing scalability across node counts
+- Identifying variance and outliers
+- Publication-quality data with error bars
 
 ### Metrics Collected
 

@@ -1,4 +1,4 @@
-# Bully Algorithm Experiments Guide
+# Bully Algorithm Experiments
 
 This document describes how to collect baseline metrics from the Bully leader election algorithm for evaluation and comparison.
 
@@ -21,8 +21,19 @@ The Bully algorithm implementation includes comprehensive metrics collection to 
 - **Election Stability**: Frequency of elections and leader changes
 - **State Distribution**: Time spent in different algorithm states
 - **Fault Tolerance**: Behavior during coordinator failures
+- **Scalability**: Performance across different network sizes (5, 10, 50, 100 nodes)
 
 These metrics align with the evaluation criteria in the thesis exposé for comparison with PraSLE and other leader election protocols.
+
+### Network Configurations
+
+The experiment suite includes four different network sizes to evaluate scalability:
+- **5 nodes**: Small network baseline (3×2 grid, 40m spacing)
+- **10 nodes**: Medium-small network (2×5 grid, 22m spacing)
+- **50 nodes**: Medium-large network (5×10 grid, 10m spacing)
+- **100 nodes**: Large network (10×10 grid, 8m spacing)
+
+All configurations use a dense network topology where all nodes are within radio range (100m), ensuring single-hop communication.
 
 ## Metrics Collected
 
@@ -85,11 +96,17 @@ These metrics align with the evaluation criteria in the thesis exposé for compa
 ```bash
 cd examples/bully/scripts
 
-# Run a 5-minute experiment
+# Run a 5-minute experiment with 5 nodes
 python3 run_experiment.py \
-    --simulation ../bully-cooja.csc \
+    --simulation ../bully-cooja-5nodes.csc \
     --duration 300 \
     --output ../results/test_run1
+
+# Or run with 100 nodes
+python3 run_experiment.py \
+    --simulation ../bully-cooja-100nodes.csc \
+    --duration 300 \
+    --output ../results/test_run2
 ```
 
 This will:
@@ -97,6 +114,12 @@ This will:
 2. Capture all log output
 3. Extract metrics to CSV
 4. Generate summary statistics
+
+**Available simulation files:**
+- `bully-cooja-5nodes.csc` - 5 nodes
+- `bully-cooja-10nodes.csc` - 10 nodes
+- `bully-cooja-50nodes.csc` - 50 nodes
+- `bully-cooja-100nodes.csc` - 100 nodes
 
 ## Running Experiments
 
@@ -117,26 +140,54 @@ python3 scripts/run_experiment.py \
 - `--output` or `-o`: Output directory for results
 - `--contiki` or `-c`: Path to Contiki-NG root (optional, auto-detected)
 
-### Option 2: Automated Scenario Suite
+### Option 2: Automated Multi-Node Scenario Suite
 
-Run multiple pre-configured scenarios:
+Run the complete experiment suite across all node counts and durations:
 
 ```bash
-cd scripts
-./run_scenarios.sh results/baseline_2025
+cd examples/bully
+./run_scenarios.sh
+# Or specify a custom output directory:
+# ./run_scenarios.sh results/my_experiment
+# ./run_scenarios.sh /absolute/path/to/output
 ```
 
-This runs:
-1. **Scenario 1** (5 min): Cold start election
-2. **Scenario 2** (15 min): Extended runtime for stability
-3. **Scenario 3** (30 min): Long-term monitoring
+This runs **12 experiments** (4 node counts × 3 durations):
 
-Each scenario produces:
+**Node Counts:** 5, 10, 50, 100 nodes
+**Durations:** 5 min, 15 min, 30 min
+
+**Experiment Matrix:**
+- 5 nodes: 5min, 15min, 30min
+- 10 nodes: 5min, 15min, 30min
+- 50 nodes: 5min, 15min, 30min
+- 100 nodes: 5min, 15min, 30min
+
+Each experiment produces:
 - Raw Cooja logs
 - Extracted metrics CSV
 - Summary statistics
 - Analysis files
 - Visualization plots
+
+**Output structure:**
+```
+examples/bully/results/baseline_YYYYMMDD_HHMMSS/
+├── 5nodes_5min/
+├── 5nodes_15min/
+├── 5nodes_30min/
+├── 10nodes_5min/
+├── 10nodes_15min/
+├── 10nodes_30min/
+├── 50nodes_5min/
+├── 50nodes_15min/
+├── 50nodes_30min/
+├── 100nodes_5min/
+├── 100nodes_15min/
+├── 100nodes_30min/
+├── analysis/
+└── SUMMARY_REPORT.txt
+```
 
 ## Analyzing Results
 
@@ -238,6 +289,60 @@ python3 scripts/plot_results.py results/test/metrics.csv \
 
 **Plot types**: `convergence`, `messages`, `elections`, `states`, `timeline`, `all`
 
+## Comparing Results Across Node Counts
+
+### Scalability Analysis
+
+After running the multi-node scenario suite, you can compare metrics across different network sizes:
+
+```bash
+# Compare convergence times (run from examples/bully/)
+RESULTS_DIR="results/baseline_YYYYMMDD_HHMMSS"  # Replace with your actual directory
+for nodes in 5 10 50 100; do
+    echo "=== $nodes nodes ==="
+    python3 scripts/parse_metrics.py \
+        $RESULTS_DIR/${nodes}nodes_5min/metrics.csv \
+        --summary | grep "convergence"
+done
+
+# Compare message overhead
+for nodes in 5 10 50 100; do
+    echo "=== $nodes nodes ==="
+    python3 scripts/parse_metrics.py \
+        $RESULTS_DIR/${nodes}nodes_5min/metrics.csv \
+        --summary | grep "Total messages"
+done
+```
+
+### Key Scalability Metrics
+
+When analyzing scalability, focus on:
+
+1. **Convergence Time vs Node Count**
+   - Does convergence time increase linearly, quadratically, or logarithmically?
+   - What is the convergence time for 5 vs 100 nodes?
+
+2. **Message Overhead vs Node Count**
+   - Total messages sent/received per node
+   - Does overhead increase as O(n) or O(n²)?
+
+3. **Election Frequency vs Node Count**
+   - More nodes = more potential failures
+   - How does election frequency scale?
+
+4. **Network Stability vs Node Count**
+   - Leader change frequency
+   - Time to stabilize after cold start
+
+### Expected Bully Algorithm Behavior
+
+The Bully algorithm's theoretical complexity:
+- **Message complexity**: O(n²) per election in worst case
+- **Time complexity**: O(n) rounds for convergence
+- **Convergence**: Deterministic, guaranteed in asynchronous networks
+
+Compare experimental results against these theoretical bounds.
+
 ## Troubleshooting
 
 ### Cooja Not Found
@@ -293,26 +398,46 @@ pip3 install matplotlib pandas
 Run multiple trials to account for randomness:
 
 ```bash
-for i in {1..5}; do
-    python3 scripts/run_experiment.py \
-        --simulation bully-cooja.csc \
-        --duration 600 \
-        --output results/baseline_trial_$i
+# Run 5 trials for each node count (run from examples/bully/)
+for nodes in 5 10 50 100; do
+    for trial in {1..5}; do
+        python3 scripts/run_experiment.py \
+            --simulation bully-cooja-${nodes}nodes.csc \
+            --duration 600 \
+            --output results/trials/${nodes}nodes_trial_${trial}
+    done
 done
 ```
 
 Then compute aggregate statistics across trials.
 
+### For Scalability Studies
+
+The multi-node experiment suite is designed to evaluate scalability:
+
+```bash
+# Run the complete suite (run from examples/bully/)
+./run_scenarios.sh
+# Results will be saved to: results/baseline_YYYYMMDD_HHMMSS/
+```
+
+This provides data for:
+- **Weak scaling**: Fixed duration, increasing nodes
+- **Performance trends**: How metrics change with network size
+- **Overhead analysis**: Message complexity vs node count
+
 ### For Comparison Studies
 
 Keep these parameters constant across experiments:
-- Network size (number of nodes)
-- Network topology
-- Radio model and parameters
-- Simulation duration
+- Network topology (dense single-hop for all node counts)
+- Radio model and parameters (100m range, perfect links)
+- Simulation duration (when comparing algorithms)
 - Timing parameters (unless studying their effect)
 
-Vary only the algorithm or specific parameters being studied.
+Vary only:
+- The algorithm being compared (Bully vs PraSLE vs others)
+- Network size (when studying scalability)
+- Specific parameters being evaluated
 
 ### Statistical Validity
 
@@ -322,15 +447,154 @@ For publishable results:
 - Use appropriate statistical tests (e.g., t-test, ANOVA)
 - Report confidence intervals
 
+## Convergence Time Statistical Analysis
+
+For rigorous statistical analysis and publication-quality data, use the convergence trials script to collect 100+ measurements.
+
+### Running Convergence Trials
+
+The `experiments/convergence/run_convergence_trials.sh` script runs multiple trials focused on convergence time:
+
+```bash
+cd examples/bully
+
+# Run 100 trials with 50 nodes (default: 60s per trial, auto-detect CPU cores)
+./experiments/convergence/run_convergence_trials.sh 50
+
+# Run 200 trials with 100 nodes (parallel execution)
+./experiments/convergence/run_convergence_trials.sh 100 200
+
+# Run 50 trials with 5 nodes, 90s duration per trial
+./experiments/convergence/run_convergence_trials.sh 5 50 90
+
+# Run 100 trials with 50 nodes using 4 parallel jobs
+./experiments/convergence/run_convergence_trials.sh 50 100 60 4
+```
+
+**Parameters**:
+- `node_count` (required): 5, 10, 50, or 100
+- `trials` (optional, default: 100): Number of trials to run
+- `duration` (optional, default: 60): Duration per trial in seconds
+- `parallel_jobs` (optional, default: auto-detect): Number of parallel jobs to run simultaneously
+
+**Parallel Execution**:
+The script automatically detects the number of CPU cores and runs trials in parallel to significantly reduce total execution time. For example, with 8 cores, 100 trials that would take ~116 minutes sequentially can complete in ~15 minutes. You can override the automatic detection by specifying the number of parallel jobs as the 4th parameter.
+
+**Important**: Each trial uses a unique random seed to ensure statistical independence. Without this, all trials would produce identical results due to Cooja's deterministic simulation.
+
+**Output**:
+```
+results/convergence_trials/{nodes}nodes_YYYYMMDD_HHMMSS/
+├── convergence_times.csv         # All measurements
+├── trial_1/metrics.csv           # Individual trial data
+├── trial_2/metrics.csv
+...
+└── trial_N/metrics.csv
+```
+
+### Visualizing Results
+
+Create distribution plots with mean and error bars:
+
+```bash
+# Simple wrapper script - auto-detects most recent trials (recommended)
+./experiments/convergence/create-convergence-plot.sh
+
+# Or specify a specific trials directory
+./experiments/convergence/create-convergence-plot.sh results/convergence_trials/50nodes_20251201_123456
+
+# Or specify custom output file
+./experiments/convergence/create-convergence-plot.sh results/convergence_trials/50nodes_20251201_123456 my_plot.png
+
+# Advanced: Use the Python script directly for custom options
+python3 scripts/plot_convergence_distribution.py \
+    -i results/convergence_trials/100nodes_20251201_123456/convergence_times.csv \
+    -o plots/convergence_100nodes.png \
+    --title "Bully Algorithm - 100 Nodes Convergence" \
+    --dpi 150
+```
+
+**Plot features**:
+- Scatter plot of all individual measurements
+- Horizontal line showing mean convergence time
+- Shaded region for ±1σ standard deviation
+- Statistics box with mean, median, std dev, min, max, CV
+- Grid for easy reading
+
+### Example Output
+
+**Console summary**:
+```
+Convergence Time Statistics:
+============================================================
+Trials:        100
+Node Count:    50
+Mean:          2,427 ms
+Median:        2,401 ms
+Std Dev:       142 ms
+Min:           2,198 ms
+Max:           2,756 ms
+Range:         558 ms
+CV:            5.8%
+============================================================
+```
+
+### Comparing Across Node Counts
+
+Run trials for each node count and compare:
+
+```bash
+# Run trials for all node counts
+for nodes in 5 10 50 100; do
+    echo "Running trials for $nodes nodes..."
+    ./experiments/convergence/run_convergence_trials.sh $nodes
+done
+
+# Generate plots for each
+for dir in results/convergence_trials/*nodes_*/; do
+    ./experiments/convergence/create-convergence-plot.sh "$dir"
+done
+```
+
+### Statistical Analysis
+
+Use the collected data for:
+
+1. **Mean comparison**: t-test or ANOVA to compare convergence times across node counts
+2. **Variance analysis**: F-test to compare consistency across configurations
+3. **Scalability trends**: Regression analysis to model convergence time vs node count
+4. **Outlier detection**: Identify and investigate anomalous convergence times
+5. **Confidence intervals**: Calculate 95% CI for mean convergence time
+
+### Use Cases
+
+**Convergence trials are ideal for**:
+- Publication data with statistical rigor
+- Comparing algorithm performance (Bully vs PraSLE vs others)
+- Analyzing scalability (how convergence time changes with network size)
+- Validating simulation consistency
+- Identifying performance regressions
+
+**Not recommended for**:
+- Testing message overhead or leader changes (use full scenario suite instead)
+- Long-term stability analysis (convergence happens quickly)
+- Partition healing (requires deliberate network manipulation)
+
 ## Next Steps
 
-After collecting Bully baseline metrics:
+After collecting Bully baseline metrics across all node counts:
 
-1. **Implement PraSLE**: Implement PraSLE algorithm in Contiki-NG
-2. **Run PraSLE experiments**: Use same experimental setup
-3. **Compare results**: Convergence time, message overhead, stability
-4. **Implement extensions**: Energy-aware, link-quality-aware, adaptive timeouts
-5. **Evaluate extensions**: Compare extended PraSLE vs baseline PraSLE vs Bully
+1. **Analyze scalability**: Compare metrics across 5, 10, 50, and 100 node configurations
+2. **Implement PraSLE**: Implement PraSLE algorithm in Contiki-NG
+3. **Create PraSLE CSC files**: Generate matching simulation files for 5, 10, 50, 100 nodes
+4. **Run PraSLE experiments**: Use same multi-node experimental setup
+5. **Compare algorithms**: Bully vs PraSLE across all node counts
+   - Convergence time vs network size
+   - Message overhead vs network size
+   - Stability and fault tolerance
+   - Scalability characteristics
+6. **Implement extensions**: Energy-aware, link-quality-aware, adaptive timeouts
+7. **Evaluate extensions**: Compare extended PraSLE vs baseline PraSLE vs Bully across all scales
 
 ## References
 

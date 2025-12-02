@@ -30,8 +30,7 @@ echo "Output: ${OUTPUT_DIR}"
 echo ""
 
 # Run the experiment
-cd "${SCRIPT_DIR}/scripts"
-python3 run_experiment.py \
+python3 "${SCRIPT_DIR}/scripts/run_experiment.py" \
     --simulation "${SIMULATION_FILE}" \
     --duration "${DURATION}" \
     --output "${OUTPUT_DIR}"

@@ -1,0 +1,16 @@
+# Experiment results
+results/
+
+# Build artifacts
+*.cooja
+*.map
+*.contiki
+build/
+obj_*/
+symbols.*
+*.log
+
+# Temporary files
+*.tmp
+*~
+.DS_Store
