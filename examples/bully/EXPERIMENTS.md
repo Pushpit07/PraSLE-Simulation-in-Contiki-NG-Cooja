@@ -1,16 +1,91 @@
 # Bully Algorithm Experiments
 
-This document describes how to collect baseline metrics from the Bully leader election algorithm for evaluation and comparison.
+This document describes how to collect metrics from the Bully leader election algorithm for evaluation and comparison across three key experiment types.
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Metrics Collected](#metrics-collected)
-3. [Quick Start](#quick-start)
-4. [Running Experiments](#running-experiments)
-5. [Analyzing Results](#analyzing-results)
-6. [Visualization](#visualization)
-7. [Troubleshooting](#troubleshooting)
+1. [Experiment Types](#experiment-types)
+2. [Overview](#overview)
+3. [Metrics Collected](#metrics-collected)
+4. [Quick Start](#quick-start)
+5. [Running Experiments](#running-experiments)
+6. [Analyzing Results](#analyzing-results)
+7. [Visualization](#visualization)
+8. [Troubleshooting](#troubleshooting)
+
+## Experiment Types
+
+The experiment suite is organized into three categories to comprehensively evaluate the Bully algorithm:
+
+### 1. Normal Election (Convergence Analysis)
+**Location:** `experiments/convergence/`
+
+**Purpose:** Measure cold-start convergence time and baseline performance under ideal network conditions.
+
+**Key Metrics:**
+- Initial convergence time (time to first leader election)
+- Message overhead during election
+- Scalability across network sizes (5, 10, 50, 100 nodes)
+
+**Scenarios:**
+- Multiple trials with different random seeds for statistical analysis
+- Variable node counts to evaluate scalability
+- Parallel execution for efficient data collection (100+ trials)
+
+**Use Cases:**
+- Baseline performance comparison with other algorithms (PraSLE, Ring, etc.)
+- Scalability analysis
+- Statistical validation of convergence properties
+
+---
+
+### 2. Leader Crash Recovery (Fault Tolerance)
+**Location:** `experiments/fault_tolerance/`
+
+**Purpose:** Evaluate the algorithm's ability to detect leader failures and elect a new coordinator.
+
+**Key Metrics:**
+- Failure detection time (should be ~20s based on COORDINATOR_TIMEOUT)
+- Re-election time
+- Total recovery time
+- Message overhead during recovery
+- Election frequency after crashes
+
+**Scenarios:**
+- Single leader crash at specific time
+- Multiple cascading crashes
+- Crash-recovery cycles
+
+**Use Cases:**
+- Fault tolerance evaluation
+- Recovery time analysis
+- Comparison with self-healing algorithms
+
+---
+
+### 3. Network Disruption (Resilience Testing)
+**Location:** `experiments/noise/` and `experiments/network_partition/`
+
+**Purpose:** Test algorithm resilience under realistic network conditions with packet loss and partitions.
+
+**Key Metrics:**
+- Convergence time under noise
+- Election success rate with packet loss
+- Message retransmission overhead
+- Partition healing time
+- Behavior with asymmetric links
+
+**Scenarios:**
+- **Noise/Packet Loss:** 10%, 30%, 50% packet loss rates
+- **Network Partitions:** Split network into isolated groups, then heal
+- **Dynamic Disruption:** Add/remove noise during simulation
+
+**Use Cases:**
+- Real-world deployment evaluation
+- Robustness analysis
+- Comparison with partition-tolerant algorithms
+
+---
 
 ## Overview
 
@@ -447,9 +522,33 @@ For publishable results:
 - Use appropriate statistical tests (e.g., t-test, ANOVA)
 - Report confidence intervals
 
-## Convergence Time Statistical Analysis
+### Random Seeds vs Fixed Seeds
 
-For rigorous statistical analysis and publication-quality data, use the convergence trials script to collect 100+ measurements.
+All trial runner scripts support a `--fixed-seed` option to control simulation randomness:
+
+| Mode | Flag | Behavior | Use Case |
+|------|------|----------|----------|
+| **Random** (default) | *(none)* | Each trial uses a unique random seed | Statistical analysis with variation |
+| **Fixed** | `--fixed-seed` | All trials use the CSC file's original seed | Reproducibility testing, debugging |
+
+**Random seeds** (default): Each trial modifies the `<randomseed>` value in the CSC file, producing different simulation outcomes. This is **required for meaningful statistical analysis** since Cooja simulations are fully deterministic - running the same CSC file twice produces identical results.
+
+**Fixed seed** (`--fixed-seed`): All trials use the original seed from the CSC template, producing identical results. Useful for:
+- Verifying experiment reproducibility
+- Debugging specific simulation behaviors
+- Confirming determinism of results
+
+The `--fixed-seed` flag can be placed anywhere in the command:
+```bash
+# All of these are equivalent:
+./experiments/convergence/run_convergence_trials.sh 50 --fixed-seed
+./experiments/convergence/run_convergence_trials.sh 50 100 --fixed-seed
+./experiments/convergence/run_convergence_trials.sh --fixed-seed 50 100 60 4
+```
+
+## Experiment 1: Normal Election (Convergence Time Statistical Analysis)
+
+For rigorous statistical analysis and publication-quality data, use the convergence trials script to collect 100+ measurements of cold-start convergence time under ideal network conditions.
 
 ### Running Convergence Trials
 
@@ -469,6 +568,9 @@ cd examples/bully
 
 # Run 100 trials with 50 nodes using 4 parallel jobs
 ./experiments/convergence/run_convergence_trials.sh 50 100 60 4
+
+# Run with fixed seed for reproducible results (all trials identical)
+./experiments/convergence/run_convergence_trials.sh 50 --fixed-seed
 ```
 
 **Parameters**:
@@ -476,6 +578,7 @@ cd examples/bully
 - `trials` (optional, default: 100): Number of trials to run
 - `duration` (optional, default: 60): Duration per trial in seconds
 - `parallel_jobs` (optional, default: auto-detect): Number of parallel jobs to run simultaneously
+- `--fixed-seed` (optional): Use same seed for all trials (see [Random Seeds vs Fixed Seeds](#random-seeds-vs-fixed-seeds))
 
 **Parallel Execution**:
 The script automatically detects the number of CPU cores and runs trials in parallel to significantly reduce total execution time. For example, with 8 cores, 100 trials that would take ~116 minutes sequentially can complete in ~15 minutes. You can override the automatic detection by specifying the number of parallel jobs as the 4th parameter.
@@ -580,6 +683,515 @@ Use the collected data for:
 - Long-term stability analysis (convergence happens quickly)
 - Partition healing (requires deliberate network manipulation)
 
+## Experiment 2: Leader Crash Recovery (Fault Tolerance Testing)
+
+Evaluate the algorithm's ability to detect coordinator failures and recover through re-election.
+
+### Running Crash Recovery Trials
+
+The `experiments/fault_tolerance/run_crash_trials.sh` script crashes the elected leader at a specific time and measures recovery:
+
+```bash
+cd examples/bully
+
+# Run 100 trials with 50 nodes, crash leader at 60s (default: 120s total duration)
+./experiments/fault_tolerance/run_crash_trials.sh 50
+
+# Run 200 trials with 100 nodes, crash leader at 60s
+./experiments/fault_tolerance/run_crash_trials.sh 100 200
+
+# Run 50 trials with 10 nodes, crash at 30s, 90s total duration
+./experiments/fault_tolerance/run_crash_trials.sh 10 50 30 90
+
+# Run 100 trials with 50 nodes, crash at 60s, 120s total, 4 parallel jobs
+./experiments/fault_tolerance/run_crash_trials.sh 50 100 60 120 4
+
+# Run with fixed seed for reproducible results
+./experiments/fault_tolerance/run_crash_trials.sh 50 --fixed-seed
+```
+
+**Parameters**:
+- `node_count` (required): 5, 10, 50, or 100
+- `trials` (optional, default: 100): Number of trials to run
+- `crash_time` (optional, default: 60): Time to crash leader in seconds
+- `duration` (optional, default: 120): Total duration per trial in seconds
+- `parallel_jobs` (optional, default: auto-detect): Number of parallel jobs
+- `--fixed-seed` (optional): Use same seed for all trials (see [Random Seeds vs Fixed Seeds](#random-seeds-vs-fixed-seeds))
+
+**Important**: `crash_time` must be less than `duration` to allow time for recovery observation.
+
+**How it works**:
+1. Simulation starts, nodes elect initial leader (highest ID)
+2. At `crash_time`, the leader is removed from the simulation
+3. Remaining nodes detect timeout (~20s based on COORDINATOR_TIMEOUT)
+4. New election begins, new leader is elected
+5. Metrics capture both initial and recovery convergence times
+
+**Output**:
+```
+results/fault_tolerance/{nodes}nodes_crash{time}s_YYYYMMDD_HHMMSS/
+├── crash_recovery_times.csv      # Recovery metrics for all trials
+├── trial_1/metrics.csv            # Individual trial data
+├── trial_2/metrics.csv
+...
+└── trial_N/metrics.csv
+```
+
+**CSV columns**:
+- `trial`: Trial number
+- `node_count`: Number of nodes
+- `crash_time_s`: When leader was crashed
+- `initial_convergence_time_ms`: Time to first leader election
+- `recovery_convergence_time_ms`: Absolute time when new leader elected
+- `total_recovery_time_ms`: Duration from crash to re-election
+
+### Visualizing Recovery Results
+
+Create recovery plots with the simple wrapper script:
+
+```bash
+# Simple wrapper script - auto-detects most recent trials (recommended)
+./experiments/fault_tolerance/create-fault-tolerance-plot.sh
+
+# Or specify a specific trials directory
+./experiments/fault_tolerance/create-fault-tolerance-plot.sh results/fault_tolerance/50nodes_crash60s_20251201_123456
+
+# Or specify the CSV file directly
+./experiments/fault_tolerance/create-fault-tolerance-plot.sh results/fault_tolerance/50nodes_crash60s_20251201_123456/crash_recovery_times.csv
+```
+
+**Advanced**: Use the Python script directly for custom options:
+
+```bash
+# Analyze crash recovery data with custom output directory
+python3 experiments/fault_tolerance/analyze_recovery.py \
+    -i results/fault_tolerance/50nodes_crash60s_20251201_123456/crash_recovery_times.csv \
+    -o analysis_output/
+
+# Skip plots, statistics only
+python3 experiments/fault_tolerance/analyze_recovery.py \
+    -i results/fault_tolerance/50nodes_crash60s_20251201_123456/crash_recovery_times.csv \
+    --no-plots
+```
+
+**Generated files**:
+- `recovery_summary.csv`: Statistical summary
+- `recovery_timeline_{nodes}nodes.png`: Timeline showing initial convergence, crash, and recovery
+- `recovery_distribution_{nodes}nodes.png`: Distribution of recovery times
+
+**Console output**:
+```
+Leader Crash Recovery Analysis:
+======================================================================
+Node Count:        50
+Crash Time:        60s
+Total Trials:      100
+======================================================================
+
+Initial Convergence (before crash):
+----------------------------------------------------------------------
+  Valid Trials:    100/100
+  Mean:            2,427 ms
+  Median:          2,401 ms
+  Std Dev:         142 ms
+  Min:             2,198 ms
+  Max:             2,756 ms
+
+Recovery Time (crash to re-election):
+----------------------------------------------------------------------
+  Valid Trials:    98/100
+  Mean:            21,543 ms (21.54s)
+  Median:          21,312 ms (21.31s)
+  Std Dev:         1,234 ms
+  Min:             20,012 ms (20.01s)
+  Max:             24,567 ms (24.57s)
+
+  Expected Detection Time: ~20s (COORDINATOR_TIMEOUT)
+  Observed Detection+Re-election: 21.54s
+======================================================================
+```
+
+### Key Fault Tolerance Metrics
+
+When analyzing crash recovery:
+
+1. **Failure Detection Time**
+   - Should be ~20 seconds (COORDINATOR_TIMEOUT value)
+   - Variance indicates timeout consistency
+
+2. **Re-Election Time**
+   - Time from detection to new leader election
+   - Similar to initial convergence time
+   - Overhead due to timeout detection
+
+3. **Total Recovery Time**
+   - End-to-end: crash → detection → re-election
+   - Critical for service availability
+   - Typically: COORDINATOR_TIMEOUT + convergence_time
+
+4. **Success Rate**
+   - Percentage of trials with successful recovery
+   - Should be 100% for robust algorithm
+
+### Comparing Recovery Across Node Counts
+
+```bash
+# Run crash recovery trials for all node counts
+for nodes in 5 10 50 100; do
+    echo "Running crash recovery trials for $nodes nodes..."
+    ./experiments/fault_tolerance/run_crash_trials.sh $nodes
+done
+
+# Analyze each
+for dir in results/fault_tolerance/*nodes_crash*; do
+    python3 experiments/fault_tolerance/analyze_recovery.py -i "$dir/crash_recovery_times.csv" -o "$dir/analysis"
+done
+```
+
+### Use Cases
+
+**Fault tolerance experiments are ideal for**:
+- Evaluating failure detection mechanisms
+- Measuring recovery time under failures
+- Testing self-healing properties
+- Comparing resilience across algorithms
+- Analyzing impact of node count on recovery
+
+## Experiment 3: Network Disruption (Resilience Testing)
+
+Test algorithm behavior under realistic network conditions with packet loss and partitions.
+
+### Running Noise/Packet Loss Trials
+
+The `experiments/noise/run_noise_trials.sh` script tests convergence under various packet loss rates:
+
+```bash
+cd examples/bully
+
+# Run 100 trials with 50 nodes, 90% success rate (10% packet loss)
+./experiments/noise/run_noise_trials.sh 50 90
+
+# Run 200 trials with 100 nodes, 70% success rate (30% packet loss)
+./experiments/noise/run_noise_trials.sh 100 70 200
+
+# Run 50 trials with 10 nodes, 50% success rate, 90s duration
+./experiments/noise/run_noise_trials.sh 10 50 50 90
+
+# Run 100 trials with 50 nodes, 90% success, 60s duration, 4 parallel jobs
+./experiments/noise/run_noise_trials.sh 50 90 100 60 4
+
+# Run with fixed seed for reproducible results
+./experiments/noise/run_noise_trials.sh 50 90 --fixed-seed
+```
+
+**Parameters**:
+- `node_count` (required): 5, 10, 50, or 100
+- `noise_level` (required): 90, 70, or 50 (success rate percentage)
+- `trials` (optional, default: 100): Number of trials to run
+- `duration` (optional, default: 60): Duration per trial in seconds
+- `parallel_jobs` (optional, default: auto-detect): Number of parallel jobs
+- `--fixed-seed` (optional): Use same seed for all trials (see [Random Seeds vs Fixed Seeds](#random-seeds-vs-fixed-seeds))
+
+**Noise levels**:
+- **90%**: Light noise (10% packet loss) - simulates good but imperfect network
+- **70%**: Moderate noise (30% packet loss) - challenging but realistic conditions
+- **50%**: Heavy noise (50% packet loss) - extreme stress test
+
+**Output**:
+```
+results/noise/{nodes}nodes_noise{level}_YYYYMMDD_HHMMSS/
+├── noise_convergence_times.csv    # Convergence and message metrics
+├── trial_1/metrics.csv             # Individual trial data
+├── trial_2/metrics.csv
+...
+└── trial_N/metrics.csv
+```
+
+**CSV columns**:
+- `trial`: Trial number
+- `node_count`: Number of nodes
+- `noise_level`: Success rate percentage
+- `convergence_time_ms`: Time to leader election
+- `message_count`: Total messages sent (includes retransmissions)
+
+### Visualizing Noise Results
+
+Create noise analysis plots with the simple wrapper script:
+
+```bash
+# Simple wrapper script - auto-detects most recent trials (recommended)
+./experiments/noise/create-noise-plot.sh
+
+# Or specify a specific trials directory
+./experiments/noise/create-noise-plot.sh results/noise/50nodes_noise90_20251201_123456
+
+# Or specify the CSV file directly
+./experiments/noise/create-noise-plot.sh results/noise/50nodes_noise90_20251201_123456/noise_convergence_times.csv
+```
+
+**Advanced**: Use the Python script directly for custom options:
+
+```bash
+# Analyze noise experiment data with custom output directory
+python3 experiments/noise/analyze_noise.py \
+    -i results/noise/50nodes_noise90_20251201_123456/noise_convergence_times.csv \
+    -o analysis_output/
+
+# Statistics only
+python3 experiments/noise/analyze_noise.py \
+    -i results/noise/50nodes_noise70_20251201_123456/noise_convergence_times.csv \
+    --no-plots
+```
+
+**Generated files**:
+- `noise_summary.csv`: Statistical summary
+- `noise{level}_convergence_{nodes}nodes.png`: Convergence time distribution
+- `noise{level}_messages_{nodes}nodes.png`: Message overhead distribution
+
+**Console output**:
+```
+Network Disruption Analysis:
+======================================================================
+Node Count:        50
+Noise Level:       90% success rate (10% packet loss)
+Total Trials:      100
+======================================================================
+
+Convergence Time (under noise):
+----------------------------------------------------------------------
+  Valid Trials:    98/100
+  Mean:            2,687 ms
+  Median:          2,654 ms
+  Std Dev:         312 ms
+  Min:             2,234 ms
+  Max:             3,456 ms
+  CV:              11.6%
+
+Message Overhead:
+----------------------------------------------------------------------
+  Valid Trials:    98/100
+  Mean:            523 messages
+  Median:          512 messages
+  Std Dev:         45 messages
+  Min:             456 messages
+  Max:             678 messages
+
+  Expected overhead increase: ~11%
+  (due to 10% packet loss requiring retransmissions)
+======================================================================
+```
+
+### Running Network Partition Trials
+
+The partition scenario creates two isolated network groups that cannot communicate, testing split-brain behavior.
+
+The `experiments/network_partition/run_partition_trials.sh` script runs multiple trials with partitioned networks:
+
+```bash
+cd examples/bully
+
+# Run 100 trials with 50 nodes (25+25 partition split)
+./experiments/network_partition/run_partition_trials.sh 50
+
+# Run 200 trials with 100 nodes
+./experiments/network_partition/run_partition_trials.sh 100 200
+
+# Run 50 trials with 10 nodes, 90s duration
+./experiments/network_partition/run_partition_trials.sh 10 50 90
+
+# Run 100 trials with 4 parallel jobs
+./experiments/network_partition/run_partition_trials.sh 50 100 60 4
+
+# Run with fixed seed for reproducible results
+./experiments/network_partition/run_partition_trials.sh 50 --fixed-seed
+```
+
+**Parameters**:
+- `node_count` (required): 5, 10, 50, or 100
+- `trials` (optional, default: 100): Number of trials to run
+- `duration` (optional, default: 60): Duration per trial in seconds
+- `parallel_jobs` (optional, default: auto-detect): Number of parallel jobs
+- `--fixed-seed` (optional): Use same seed for all trials (see [Random Seeds vs Fixed Seeds](#random-seeds-vs-fixed-seeds))
+
+**Partition Configuration**:
+
+| Nodes | Partition A | Partition B | Expected Leaders |
+|-------|-------------|-------------|------------------|
+| 5     | Nodes 1-2   | Nodes 3-5   | Node 2 + Node 5  |
+| 10    | Nodes 1-5   | Nodes 6-10  | Node 5 + Node 10 |
+| 50    | Nodes 1-25  | Nodes 26-50 | Node 25 + Node 50|
+| 100   | Nodes 1-50  | Nodes 51-100| Node 50 + Node 100|
+
+**How it works**:
+1. Partitions are separated by 180m (radio range is 100m)
+2. Each partition elects its own leader independently
+3. This creates a "split-brain" scenario with two leaders
+4. Metrics capture convergence time for both partitions
+
+**Output**:
+```
+results/network_partition/{nodes}nodes_partition_YYYYMMDD_HHMMSS/
+├── partition_times.csv           # All partition metrics
+├── trial_1/metrics.csv           # Individual trial data
+├── trial_2/metrics.csv
+...
+└── trial_N/metrics.csv
+```
+
+**CSV columns**:
+- `trial`: Trial number
+- `node_count`: Number of nodes
+- `partition_a_convergence_ms`: Convergence time for partition A
+- `partition_b_convergence_ms`: Convergence time for partition B
+- `partition_a_leader`: Leader elected in partition A
+- `partition_b_leader`: Leader elected in partition B
+- `split_brain`: Whether split-brain occurred (should be true)
+
+### Visualizing Partition Results
+
+Create partition analysis plots with the simple wrapper script:
+
+```bash
+# Simple wrapper script - auto-detects most recent trials (recommended)
+./experiments/network_partition/create-partition-plot.sh
+
+# Or specify a specific trials directory
+./experiments/network_partition/create-partition-plot.sh results/network_partition/50nodes_partition_20231201_123456
+
+# Or specify the CSV file directly
+./experiments/network_partition/create-partition-plot.sh results/network_partition/50nodes_partition_20231201_123456/partition_times.csv
+```
+
+**Advanced**: Use the Python script directly for custom options:
+
+```bash
+# Analyze partition data with custom output directory
+python3 experiments/network_partition/analyze_partition.py \
+    -i results/network_partition/50nodes_partition_20231201_123456/partition_times.csv \
+    -o analysis_output/
+
+# Skip plots, statistics only
+python3 experiments/network_partition/analyze_partition.py \
+    -i results/network_partition/50nodes_partition_20231201_123456/partition_times.csv \
+    --no-plots
+```
+
+**Generated files**:
+- `partition_summary.csv`: Statistical summary for both partitions
+- `partition_convergence_{nodes}nodes.png`: Convergence time comparison
+- `partition_leaders_{nodes}nodes.png`: Leader distribution for each partition
+
+**Console output**:
+```
+Network Partition Analysis:
+======================================================================
+Node Count:        50
+Partition A:       Nodes 1-25 (expected leader: 25)
+Partition B:       Nodes 26-50 (expected leader: 50)
+Total Trials:      100
+======================================================================
+
+Partition A Convergence Time:
+----------------------------------------------------------------------
+  Valid Trials:    100/100
+  Mean:            2,427 ms
+  Median:          2,401 ms
+  Std Dev:         142 ms
+  Min:             2,198 ms
+  Max:             2,756 ms
+
+Partition B Convergence Time:
+----------------------------------------------------------------------
+  Valid Trials:    100/100
+  Mean:            2,512 ms
+  Median:          2,489 ms
+  Std Dev:         156 ms
+  Min:             2,234 ms
+  Max:             2,845 ms
+
+Split-Brain Detection:
+----------------------------------------------------------------------
+  Trials with split-brain: 100/100 (100.0%)
+  Expected: 100% (partitions should elect independent leaders)
+======================================================================
+```
+
+### Key Partition Metrics
+
+1. **Convergence Time per Partition**
+   - How quickly does each partition elect its leader?
+   - Should be similar to normal election (no interference)
+   - Compare between partitions of different sizes
+
+2. **Leader Correctness**
+   - Did each partition elect the highest-ID node?
+   - Expected: 100% correct leader selection
+   - Any deviation indicates algorithm issues
+
+3. **Split-Brain Detection**
+   - Did both partitions elect independent leaders?
+   - Expected: 100% split-brain (by design)
+   - Verifies partition isolation is working
+
+4. **Use Cases**
+   - Testing partition detection mechanisms
+   - Evaluating split-brain scenarios
+   - Comparing with partition-tolerant algorithms
+   - Baseline for partition healing experiments
+
+### Comparing Across Noise Levels
+
+```bash
+# Run noise experiments for all levels
+for noise in 90 70 50; do
+    echo "Running trials with ${noise}% success rate..."
+    ./experiments/noise/run_noise_trials.sh 50 $noise
+done
+
+# Analyze each
+for dir in results/noise/50nodes_noise*; do
+    python3 experiments/noise/analyze_noise.py -i "$dir/noise_convergence_times.csv" -o "$dir/analysis"
+done
+
+# Compare results
+echo "=== Convergence Time vs Noise Level ==="
+for dir in results/noise/50nodes_noise*/analysis; do
+    echo "$(basename $(dirname $dir)):"
+    grep "Mean" "$dir/noise_summary.csv" | head -1
+done
+```
+
+### Key Resilience Metrics
+
+1. **Convergence Time Increase**
+   - How much does packet loss slow convergence?
+   - Expected: Higher packet loss → longer convergence
+   - Measure: % increase vs baseline (0% loss)
+
+2. **Message Overhead**
+   - Total messages sent including retransmissions
+   - Expected: ~(100/success_rate) multiplier
+   - Example: 50% success → ~2x messages
+
+3. **Convergence Success Rate**
+   - Percentage of trials reaching consensus
+   - Should remain high even under noise
+   - Indicates algorithm robustness
+
+4. **Variance/Consistency**
+   - Standard deviation and CV
+   - Higher noise → higher variance expected
+   - Measure of predictability under disruption
+
+### Use Cases
+
+**Network disruption experiments are ideal for**:
+- Real-world deployment validation
+- Robustness testing under packet loss
+- Comparing resilience across algorithms
+- Analyzing retransmission overhead
+- Testing partition detection and handling
+
 ## Next Steps
 
 After collecting Bully baseline metrics across all node counts:
@@ -595,6 +1207,174 @@ After collecting Bully baseline metrics across all node counts:
    - Scalability characteristics
 6. **Implement extensions**: Energy-aware, link-quality-aware, adaptive timeouts
 7. **Evaluate extensions**: Compare extended PraSLE vs baseline PraSLE vs Bully across all scales
+
+## Quick Reference: All Available Experiments
+
+### Experiment 1: Normal Election (Convergence Time)
+
+**Location:** `experiments/convergence/`
+
+| Command | Description |
+|---------|-------------|
+| `./experiments/convergence/run_convergence_trials.sh 50` | Run 100 trials with 50 nodes |
+| `./experiments/convergence/run_convergence_trials.sh 100 200` | Run 200 trials with 100 nodes |
+| `./experiments/convergence/run_convergence_trials.sh 5 50 90` | 50 trials, 5 nodes, 90s duration |
+| `./experiments/convergence/run_convergence_trials.sh 50 100 60 4` | 100 trials, 4 parallel jobs |
+| `./experiments/convergence/run_convergence_trials.sh 50 --fixed-seed` | Fixed seed (reproducible) |
+| `./experiments/convergence/create-convergence-plot.sh` | Generate plots (auto-detect latest) |
+
+**Node counts:** 5, 10, 50, 100
+
+---
+
+### Experiment 2: Leader Crash Recovery (Fault Tolerance)
+
+**Location:** `experiments/fault_tolerance/`
+
+| Command | Description |
+|---------|-------------|
+| `./experiments/fault_tolerance/run_crash_trials.sh 50` | 100 trials, crash at 60s, 120s total |
+| `./experiments/fault_tolerance/run_crash_trials.sh 100 200` | 200 trials with 100 nodes |
+| `./experiments/fault_tolerance/run_crash_trials.sh 10 50 30 90` | 50 trials, crash at 30s, 90s total |
+| `./experiments/fault_tolerance/run_crash_trials.sh 50 100 60 120 4` | 100 trials, 4 parallel jobs |
+| `./experiments/fault_tolerance/run_crash_trials.sh 50 --fixed-seed` | Fixed seed (reproducible) |
+| `./experiments/fault_tolerance/create-fault-tolerance-plot.sh` | Generate plots (auto-detect latest) |
+
+**Node counts:** 5, 10, 50, 100
+
+---
+
+### Experiment 3a: Network Noise (Packet Loss)
+
+**Location:** `experiments/noise/`
+
+| Command | Description |
+|---------|-------------|
+| `./experiments/noise/run_noise_trials.sh 50 90` | 100 trials, 50 nodes, 90% success (10% loss) |
+| `./experiments/noise/run_noise_trials.sh 100 70 200` | 200 trials, 100 nodes, 70% success |
+| `./experiments/noise/run_noise_trials.sh 10 50 50 90` | 50 trials, 10 nodes, 50% success, 90s |
+| `./experiments/noise/run_noise_trials.sh 50 90 100 60 4` | 100 trials, 4 parallel jobs |
+| `./experiments/noise/run_noise_trials.sh 50 90 --fixed-seed` | Fixed seed (reproducible) |
+| `./experiments/noise/create-noise-plot.sh` | Generate plots (auto-detect latest) |
+
+**Node counts:** 5, 10, 50, 100
+**Noise levels:** 90 (10% loss), 70 (30% loss), 50 (50% loss)
+
+---
+
+### Experiment 3b: Network Partition (Split-Brain)
+
+**Location:** `experiments/network_partition/`
+
+| Command | Description |
+|---------|-------------|
+| `./experiments/network_partition/run_partition_trials.sh 50` | 100 trials, 50 nodes (25+25 split) |
+| `./experiments/network_partition/run_partition_trials.sh 100 200` | 200 trials, 100 nodes |
+| `./experiments/network_partition/run_partition_trials.sh 10 50 90` | 50 trials, 10 nodes, 90s duration |
+| `./experiments/network_partition/run_partition_trials.sh 50 100 60 4` | 100 trials, 4 parallel jobs |
+| `./experiments/network_partition/run_partition_trials.sh 50 --fixed-seed` | Fixed seed (reproducible) |
+| `./experiments/network_partition/create-partition-plot.sh` | Generate plots (auto-detect latest) |
+
+**Node counts:** 5, 10, 50, 100
+**Partition splits:** 5 (2+3), 10 (5+5), 50 (25+25), 100 (50+50)
+
+---
+
+### Run All Experiments (Complete Suite)
+
+Use the master script to run all experiments at once:
+
+```bash
+cd examples/bully
+
+# Run ALL experiments with defaults (100 trials each, all node counts)
+./experiments/run_all_experiments.sh
+
+# Run with custom number of trials
+./experiments/run_all_experiments.sh --trials 50
+
+# Run only specific node counts
+./experiments/run_all_experiments.sh --nodes 5,10
+
+# Run only specific experiments
+./experiments/run_all_experiments.sh --experiments convergence,noise
+
+# Preview what would run (dry run)
+./experiments/run_all_experiments.sh --dry-run
+
+# Full customization
+./experiments/run_all_experiments.sh --trials 200 --nodes 50,100 --parallel 8
+```
+
+**Available options:**
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--trials N` | Number of trials per experiment | 100 |
+| `--nodes LIST` | Comma-separated node counts | 5,10,50,100 |
+| `--experiments E` | Experiments to run: convergence, fault_tolerance, noise, partition, all | all |
+| `--noise-levels L` | Noise levels for noise experiments | 90,70,50 |
+| `--parallel N` | Number of parallel jobs | auto-detect |
+| `--dry-run` | Preview commands without executing | - |
+
+**Manual execution** (if you prefer running individually):
+
+```bash
+cd examples/bully
+
+# Run all convergence trials for all node counts
+for nodes in 5 10 50 100; do
+    ./experiments/convergence/run_convergence_trials.sh $nodes
+done
+
+# Run all crash recovery trials for all node counts
+for nodes in 5 10 50 100; do
+    ./experiments/fault_tolerance/run_crash_trials.sh $nodes
+done
+
+# Run all noise trials for all node counts and noise levels
+for nodes in 5 10 50 100; do
+    for noise in 90 70 50; do
+        ./experiments/noise/run_noise_trials.sh $nodes $noise
+    done
+done
+
+# Run all partition trials for all node counts
+for nodes in 5 10 50 100; do
+    ./experiments/network_partition/run_partition_trials.sh $nodes
+done
+```
+
+### Generate All Plots
+
+Use the master script to generate all plots at once:
+
+```bash
+cd examples/bully
+
+# Generate ALL plots (auto-detects most recent results)
+./experiments/generate_all_plots.sh
+
+# Generate only specific experiment plots
+./experiments/generate_all_plots.sh --experiments convergence,noise
+```
+
+**Manual execution** (if you prefer running individually):
+
+```bash
+cd examples/bully
+
+# Generate convergence plots
+./experiments/convergence/create-convergence-plot.sh
+
+# Generate fault tolerance plots
+./experiments/fault_tolerance/create-fault-tolerance-plot.sh
+
+# Generate noise plots
+./experiments/noise/create-noise-plot.sh
+
+# Generate partition plots
+./experiments/network_partition/create-partition-plot.sh
+```
 
 ## References
 

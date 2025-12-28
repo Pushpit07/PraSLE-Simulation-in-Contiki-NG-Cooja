@@ -644,6 +644,30 @@ Keep the current implementation where:
 
 This implementation includes comprehensive metrics collection for evaluating leader election performance. The system is fully automated with headless Cooja execution and automatic metrics collection.
 
+### Experiment Types
+
+The experiment suite is organized into three categories for comprehensive evaluation:
+
+1. **Normal Election (Convergence Analysis)** - `experiments/convergence/`
+   - Measure cold-start convergence time under ideal network conditions
+   - Multiple trials (100+) with statistical analysis
+   - Scalability testing across network sizes (5, 10, 50, 100 nodes)
+   - Baseline performance for algorithm comparison
+
+2. **Leader Crash Recovery (Fault Tolerance)** - `experiments/fault_tolerance/`
+   - Crash the elected leader at a specific time
+   - Measure failure detection (~20s timeout) and re-election time
+   - Evaluate self-healing and recovery properties
+   - Test resilience under coordinator failures
+
+3. **Network Disruption (Resilience Testing)** - `experiments/noise/` and `experiments/network_partition/`
+   - Test under packet loss (10%, 30%, 50% loss rates)
+   - Evaluate network partition scenarios
+   - Measure convergence degradation and message overhead
+   - Validate robustness in realistic conditions
+
+**See [EXPERIMENTS.md](EXPERIMENTS.md) for detailed instructions on running each experiment type.**
+
 ### Prerequisites
 
 1. **Build Cooja** (one-time setup):
@@ -779,6 +803,9 @@ cd examples/bully
 # Run with specific number of parallel jobs (e.g., 4)
 ./experiments/convergence/run_convergence_trials.sh 50 100 60 4
 
+# Run with fixed seed for reproducible results (all trials use same seed)
+./experiments/convergence/run_convergence_trials.sh 50 --fixed-seed
+
 # Visualize the distribution (auto-detects most recent trials)
 ./experiments/convergence/create-convergence-plot.sh
 
@@ -801,6 +828,37 @@ This will:
    - Mean (dashed line)
    - ±1σ standard deviation (shaded region)
    - Summary statistics box
+
+#### Random Seeds vs Fixed Seeds
+
+All trial runner scripts support a `--fixed-seed` option to control simulation randomness:
+
+| Mode | Flag | Behavior | Use Case |
+|------|------|----------|----------|
+| **Random** (default) | *(none)* | Each trial uses a unique random seed | Statistical analysis with variation |
+| **Fixed** | `--fixed-seed` | All trials use the CSC file's original seed | Reproducibility testing, debugging |
+
+**Random seeds** (default): Each trial modifies the `<randomseed>` value in the CSC file, producing different simulation outcomes. This is required for meaningful statistical analysis since Cooja simulations are fully deterministic - running the same CSC file twice produces identical results.
+
+**Fixed seed** (`--fixed-seed`): All trials use the original seed from the CSC template, producing identical results. Useful for:
+- Verifying experiment reproducibility
+- Debugging specific simulation behaviors
+- Confirming determinism of results
+
+Example with all trial scripts:
+```bash
+# Convergence trials
+./experiments/convergence/run_convergence_trials.sh 50 --fixed-seed
+
+# Crash recovery trials
+./experiments/fault_tolerance/run_crash_trials.sh 50 --fixed-seed
+
+# Noise resilience trials
+./experiments/noise/run_noise_trials.sh 50 90 --fixed-seed
+
+# Partition trials
+./experiments/network_partition/run_partition_trials.sh 50 --fixed-seed
+```
 
 **Use this for**:
 - Statistical validation of convergence time
