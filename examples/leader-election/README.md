@@ -4,10 +4,13 @@ A comprehensive framework for evaluating leader election algorithms in wireless 
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
 - [Overview](#overview)
+- [Leader Election Concepts](#leader-election-concepts)
 - [Supported Algorithms](#supported-algorithms)
 - [Directory Structure](#directory-structure)
 - [Building](#building)
+  - [Opening in Cooja GUI](#opening-in-cooja-gui)
 - [Running Experiments](#running-experiments)
   - [Master Experiment Runner](#master-experiment-runner)
   - [Convergence Experiments](#convergence-experiments)
@@ -19,10 +22,84 @@ A comprehensive framework for evaluating leader election algorithms in wireless 
 - [CSC Template Generation](#csc-template-generation)
 - [Results Structure](#results-structure)
 - [Examples](#examples)
+- [Quick Metrics Collection](#quick-metrics-collection)
+- [Network Partitioning and Split-Brain Behavior](#network-partitioning-and-split-brain-behavior)
+- [Testing Scenarios](#testing-scenarios)
+- [Educational Value](#educational-value)
+- [Advanced: Multi-Hop Routing](#advanced-multi-hop-routing)
+- [References](#references)
 
 ## Additional Documentation
 
 - **[EXPERIMENTS.md](EXPERIMENTS.md)** - Detailed experiment guide with metrics definitions, statistical analysis, and troubleshooting
+
+---
+
+## Quick Start
+
+Get up and running in 3 steps:
+
+### Step 1: Build an Algorithm
+
+```bash
+cd examples/leader-election
+
+# Interactive mode - shows menu to select algorithm
+./build.sh
+
+# Or specify directly
+./build.sh bully              # Build Bully algorithm
+./build.sh ring               # Build Ring algorithm
+./build.sh prasle             # Build PraSLE algorithm
+./build.sh adaptive-prasle    # Build Adaptive-PraSLE algorithm
+./build.sh all                # Build all algorithms
+./build.sh clean              # Clean all builds
+```
+
+### Step 2: Run a Quick Experiment
+
+```bash
+# Collect metrics with a quick test (60 seconds default)
+./create-metrics.sh bully
+
+# Or specify duration and output name
+./create-metrics.sh bully 300              # 5-minute experiment
+./create-metrics.sh ring 120 my_test       # 2-minute experiment with custom name
+./create-metrics.sh prasle 60              # 1-minute prasle test
+```
+
+### Step 3: View Results
+
+```bash
+# View the summary
+cat results/bully/metrics/summary.txt
+
+# View detailed metrics
+cat results/bully/metrics/metrics.csv
+
+# Generate plots (requires matplotlib)
+python3 scripts/plot_results.py results/bully/metrics/
+```
+
+### Open in Cooja GUI (Optional)
+
+To observe the simulation visually:
+
+```bash
+# Start Cooja
+cd ../../tools/cooja
+./gradlew run
+
+# In Cooja: File → Open Simulation → Browse to:
+# examples/leader-election/experiments/convergence/csc_templates/bully/5nodes.csc
+```
+
+Or use quickstart:
+
+```bash
+java -jar ../../tools/cooja/dist/cooja.jar \
+    -quickstart=experiments/convergence/csc_templates/bully/5nodes.csc
+```
 
 ---
 
@@ -33,6 +110,63 @@ This framework provides tools for:
 - Collecting metrics (convergence time, message overhead, leader correctness)
 - Statistical analysis across multiple trials
 - Visualization and comparison of algorithm performance
+
+## Leader Election Concepts
+
+### What is Leader Election?
+
+**Leader election** is a fundamental problem in distributed systems where a group of nodes must agree on a single node to act as the coordinator (leader). The leader typically:
+- Coordinates group activities
+- Makes decisions on behalf of the group
+- Distributes tasks to other nodes
+- Acts as a central point for data aggregation
+
+### Why Leader Election Matters
+
+In wireless sensor networks and IoT applications, leader election is critical for:
+- **Data aggregation**: Collecting data from multiple sensors
+- **Time synchronization**: Coordinating clocks across the network
+- **Resource management**: Allocating shared resources
+- **Fault tolerance**: Recovering from node failures
+
+### Common Message Types
+
+Most leader election algorithms use similar message types:
+
+| Type | Purpose | Example |
+|------|---------|---------|
+| **Election** | Initiate an election process | "I'm starting an election" |
+| **Response/Answer** | Reply to election messages | "I have higher priority" |
+| **Coordinator/Leader** | Announce the new leader | "I am the new leader" |
+| **Heartbeat/Alive** | Prove the leader is alive | "I'm still functioning" |
+
+### Common Node States
+
+Leader election algorithms typically use these states:
+
+| State | Description |
+|-------|-------------|
+| **Normal/Follower** | Regular operation with a known leader |
+| **Election/Candidate** | Participating in an election process |
+| **Waiting** | Waiting for election results |
+| **Leader** | Acting as the coordinator |
+
+### Network Stack
+
+This framework supports two network stacks:
+
+**IPv6/UDP Stack** (used by Bully):
+- Transport: UDP on port 8765
+- Network: IPv6 with link-local multicast (`ff02::1`)
+- Routing: RPL Lite (lightweight routing protocol for IoT)
+- MAC: CSMA (Carrier Sense Multiple Access)
+
+**Nullnet Stack** (used by Ring, PraSLE, Adaptive-PraSLE):
+- Lightweight broadcast-based communication
+- Direct radio communication without IP overhead
+- Suitable for simple, single-hop networks
+
+**Note**: Link-local multicast (`ff02::1`) only reaches nodes in direct radio range. For multi-hop communication, see the [Advanced: Multi-Hop Routing](#advanced-multi-hop-routing) section.
 
 ## Supported Algorithms
 
@@ -116,6 +250,47 @@ make ALGORITHM=adaptive-prasle TARGET=cooja
 
 # Clean build
 make clean
+```
+
+### Opening in Cooja GUI
+
+To manually run and observe the simulation in Cooja's graphical interface:
+
+**Available CSC files** (located in `experiments/convergence/csc_templates/{algorithm}/`):
+
+| File | Description |
+|------|-------------|
+| `5nodes.csc` | Basic 5-node simulation |
+| `10nodes.csc` | Basic 10-node simulation |
+| `50nodes.csc` | Basic 50-node simulation |
+| `100nodes.csc` | Basic 100-node simulation |
+| `*-crash.csc` | Leader crash scenarios |
+| `*-noise{50,70,90}.csc` | Packet loss scenarios |
+| `*-partition.csc` | Network partition scenarios |
+
+**Option 1: Open Cooja GUI first**
+```bash
+# Build the algorithm first
+cd examples/leader-election
+make ALGORITHM=bully TARGET=cooja
+
+# Launch Cooja
+cd ../../tools/cooja
+./gradlew run
+
+# In Cooja: File → Open Simulation → Browse to:
+# examples/leader-election/experiments/convergence/csc_templates/bully/5nodes.csc
+```
+
+**Option 2: Direct quickstart**
+```bash
+# Build first
+cd examples/leader-election
+make ALGORITHM=bully TARGET=cooja
+
+# Launch with CSC file directly
+java -jar ../../tools/cooja/dist/cooja.jar \
+    -quickstart=experiments/convergence/csc_templates/bully/5nodes.csc
 ```
 
 ---
@@ -561,6 +736,51 @@ python3 run_experiment.py \
 
 ---
 
+## Quick Metrics Collection
+
+The `create-metrics.sh` script provides a simple wrapper for running experiments without typing long commands. It's ideal for quick tests and collecting metrics for a single algorithm.
+
+```bash
+# Usage
+./create-metrics.sh <algorithm> [duration] [output_name]
+```
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `algorithm` | Algorithm to test: bully, ring, prasle, adaptive-prasle (required) | - |
+| `duration` | Duration in seconds | 60 |
+| `output_name` | Output directory name | metrics |
+
+**Examples:**
+
+```bash
+# Run 60-second experiment with default output
+./create-metrics.sh bully
+
+# Run 5-minute experiment
+./create-metrics.sh ring 300
+
+# Run 2-minute experiment with custom output name
+./create-metrics.sh prasle 120 my_test
+```
+
+**Output Location:** `results/{algorithm}/{output_name}/`
+
+The script will generate:
+- `summary.txt` - Human-readable experiment summary
+- `metrics.csv` - Detailed metrics data
+
+**View Results:**
+
+```bash
+cat results/bully/metrics/summary.txt
+cat results/bully/metrics/metrics.csv
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Description | Used By |
@@ -601,6 +821,238 @@ python3 generate_csc.py --experiment all --output ../experiments/
 - Ensure parallel jobs don't exceed system capacity
 - Check disk space for results
 - Verify write permissions in results directory
+
+---
+
+## Network Partitioning and Split-Brain Behavior
+
+### What is Network Partitioning?
+
+A **network partition** (or "split-brain") occurs when nodes cannot communicate with each other due to:
+- Physical distance exceeding radio range
+- RF interference or obstacles
+- Link failures
+- Intentional network segmentation
+
+### Partition Behavior
+
+When the network partitions, leader election algorithms exhibit **correct distributed algorithm behavior**:
+
+1. **Each partition independently elects its own coordinator**
+   - Partition 1: Nodes {1, 2, 4} → Highest-ID node becomes coordinator
+   - Partition 2: Nodes {3, 5, 6} → Highest-ID node becomes coordinator
+   - Each partition elects the highest-priority node available to it
+
+2. **Multiple coordinators exist simultaneously**
+   - This is **not a bug** - it's expected behavior for partitioned networks
+   - Each coordinator only manages nodes within its partition
+   - Nodes cannot detect coordinators they cannot communicate with
+
+3. **Partition healing**
+   - When partitions reconnect, nodes discover higher-priority coordinators
+   - System converges to a single coordinator (the globally highest-priority node)
+   - Different algorithms have different healing mechanisms
+
+### Example Partition Scenario
+
+**Initial Network** (all connected):
+```
+[1]---[2]---[3]
+             |
+[4]---[5]---[6]
+```
+- Single coordinator: Node 6 (highest priority)
+
+**After Partition** (link 3-6 breaks):
+```
+Partition A:        Partition B:
+[1]---[2]---[3]     [6]
+                     |
+[4]---[5]           (isolated)
+```
+- Partition A coordinator: Node 5
+- Partition B coordinator: Node 6
+
+**After Healing** (link 3-6 restored):
+```
+[1]---[2]---[3]
+             |
+[4]---[5]---[6]
+```
+- System converges back to Node 6 as single coordinator
+
+### Why This is Correct Behavior
+
+Leader election algorithms are designed to handle partitions this way:
+
+- **Availability over consistency**: Each partition can continue operating independently
+- **Eventual consistency**: When partitions heal, the system converges to a single leader
+- **No false assumptions**: Nodes don't assume unreachable nodes are "dead" - they just elect from reachable nodes
+
+---
+
+## Testing Scenarios
+
+### Scenario 1: Normal Operation (All Nodes Connected)
+
+**Setup**: Start all nodes within radio range of each other
+
+**Expected Behavior**:
+1. Random startup delays (0-5 seconds) stagger initial elections
+2. Multiple elections may occur as nodes discover higher-priority nodes
+3. Highest-ID node becomes coordinator after ~5-10 seconds
+4. Logs show heartbeat messages from coordinator periodically
+5. All nodes receive and acknowledge heartbeat messages
+6. NO further election messages after system stabilizes
+7. System remains stable indefinitely
+
+**Success Criteria**: Single coordinator (highest ID), periodic heartbeats, no election storms
+
+---
+
+### Scenario 2: Leader Failure
+
+**Setup**: Wait for stable coordinator sending heartbeat messages
+
+**Steps**:
+1. Stop/kill the coordinator using Cooja (right-click → Stop node)
+2. Wait and observe logs
+
+**Expected Behavior**:
+1. Heartbeat messages from coordinator stop
+2. After timeout period, nodes detect failure
+3. Nodes log timeout and start new election
+4. Next highest-ID node wins election and becomes new coordinator
+5. New coordinator begins sending heartbeat messages
+6. System stabilizes with new leader
+
+**Success Criteria**: Clean failover within timeout period, no election storms
+
+---
+
+### Scenario 3: Network Partition (Split-Brain)
+
+**Setup**: Position nodes in two separate groups out of radio range
+
+**Expected Behavior**:
+1. Each partition independently elects a coordinator
+2. Each partition shows heartbeat activity from its coordinator
+3. Nodes in one partition show NO activity from the other partition
+4. Both partitions operate independently and stably
+
+**Success Criteria**: Two independent coordinators, each partition stable
+
+---
+
+### Scenario 4: Partition Healing
+
+**Setup**: Continue from partitioned network
+
+**Steps**:
+1. Move nodes back into radio range of each other
+2. Observe convergence behavior
+
+**Expected Behavior**:
+1. Nodes discover higher-priority coordinator from other partition
+2. System converges to single coordinator
+3. All nodes acknowledge the same leader
+
+**Success Criteria**: Fast convergence, all nodes acknowledge single coordinator
+
+---
+
+### Scenario 5: Multiple Cascading Failures
+
+**Setup**: Start with all nodes, wait for highest-ID node to become coordinator
+
+**Steps**:
+1. Stop highest-ID node → Wait for next node to become coordinator
+2. Stop that node → Wait for next node to become coordinator
+3. Continue stopping nodes
+4. Restart original highest-ID node → Wait for system to reconverge
+
+**Expected Behavior**:
+1. Each failure triggers election within timeout period
+2. Next highest-priority node becomes coordinator
+3. When original leader restarts, it initiates election
+4. System recognizes it as highest priority and elects it
+5. Final state: Original leader is coordinator
+
+**Success Criteria**: Clean transitions at each failure, original leader reclaims leadership when restarted
+
+---
+
+## Educational Value
+
+This framework demonstrates:
+
+- **Distributed algorithms** in IoT networks
+- **Leader election** mechanisms and trade-offs
+- **Fault tolerance** in distributed systems
+- **Message passing** using Contiki-NG
+- **Network simulation** with Cooja
+- **Statistical analysis** of algorithm performance
+- **Scalability evaluation** across network sizes
+
+---
+
+## Advanced: Multi-Hop Routing
+
+The current implementations use link-local multicast which only reaches directly reachable neighbors. To enable **true multi-hop routing** where all nodes can communicate regardless of physical distance:
+
+### Option A: Configure RPL Root + Site-Local Multicast
+
+1. **Designate one node as RPL DODAG root** (typically the highest-priority node):
+   ```c
+   #include "net/routing/rpl-lite/rpl.h"
+
+   // In PROCESS_THREAD, after UDP initialization:
+   if (my_node_id == HIGHEST_ID) {
+     rpl_dag_root_init_dag_immediately();
+     LOG_INFO("Configured as RPL DODAG root\n");
+   }
+   ```
+
+2. **Change multicast address to site-local**:
+   ```c
+   // In send_message() and broadcast_message():
+   uip_ipaddr_t dest_addr;
+   uip_ip6addr(&dest_addr, 0xff05, 0, 0, 0, 0, 0, 0, 0x0001);  // ff05::1
+   ```
+
+3. **Add delay for RPL convergence**:
+   ```c
+   // Wait 30-60 seconds after startup before starting elections
+   etimer_set(&rpl_wait_timer, 60 * CLOCK_SECOND);
+   PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&rpl_wait_timer));
+   ```
+
+### Option B: Application-Level Flooding
+
+Implement hop-by-hop message flooding:
+
+1. **Track recently seen messages** (sequence tracking already implemented)
+2. **Re-broadcast once**: When receiving a message for the first time, re-broadcast it
+3. **Stop propagation**: Don't re-broadcast messages already seen
+
+This is simpler but generates more network traffic.
+
+### Option C: Accept Partition-Tolerant Behavior (Current)
+
+Keep the current implementation where:
+- Partitions elect independent coordinators
+- Suitable for networks where partitions are expected
+- Lower complexity and overhead
+
+---
+
+## References
+
+- **Bully Algorithm**: Garcia-Molina, H. (1982). "Elections in a Distributed Computing System"
+- **Ring Algorithm**: Chang, E. and Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes"
+- **PraSLE**: Self-stabilizing probabilistic leader election for wireless sensor networks
+- **Contiki-NG Documentation**: https://github.com/contiki-ng/contiki-ng
+- **Cooja Simulator Guide**: Contiki-NG Wiki
 
 ---
 

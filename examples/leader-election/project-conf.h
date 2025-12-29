@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2024, TU Dresden
- * All rights reserved.
- *
  * Leader Election Algorithm Framework - Project Configuration
  */
 
 #ifndef PROJECT_CONF_H_
 #define PROJECT_CONF_H_
+
+/* Enable IPv6 with RPL routing for multi-hop communication */
+#define NETSTACK_CONF_WITH_IPV6 1
+#define UIP_CONF_ROUTER 1
 
 /*---------------------------------------------------------------------------*/
 /* Logging Configuration */
@@ -16,6 +17,8 @@
 #define LOG_CONF_LEVEL_TCPIP                       LOG_LEVEL_WARN
 #define LOG_CONF_LEVEL_MAC                         LOG_LEVEL_WARN
 #define LOG_CONF_LEVEL_FRAMER                      LOG_LEVEL_WARN
+/* Logging */
+#define LOG_CONF_LEVEL_MAIN                        LOG_LEVEL_INFO
 
 /*---------------------------------------------------------------------------*/
 /* Network Configuration - Algorithm-Specific */

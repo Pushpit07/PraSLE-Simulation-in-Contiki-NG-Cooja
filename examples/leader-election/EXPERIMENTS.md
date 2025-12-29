@@ -4,14 +4,25 @@ This document describes how to run and analyze experiments for all leader electi
 
 ## Table of Contents
 
-1. [Experiment Types](#experiment-types)
-2. [Overview](#overview)
-3. [Metrics Collected](#metrics-collected)
-4. [Quick Start](#quick-start)
-5. [Running Experiments](#running-experiments)
-6. [Analyzing Results](#analyzing-results)
-7. [Visualization](#visualization)
-8. [Troubleshooting](#troubleshooting)
+1. [Supported Algorithms](#supported-algorithms)
+2. [Experiment Types](#experiment-types)
+3. [Overview](#overview)
+4. [Metrics Collected](#metrics-collected)
+5. [Quick Start](#quick-start)
+6. [Running Experiments](#running-experiments)
+7. [Random Seeds vs Fixed Seeds](#random-seeds-vs-fixed-seeds)
+8. [Analyzing Results](#analyzing-results)
+9. [Visualization](#visualization)
+10. [Quick Reference: All Available Commands](#quick-reference-all-available-commands)
+11. [Experiment Design Recommendations](#experiment-design-recommendations)
+12. [Expected Algorithm Behavior](#expected-algorithm-behavior)
+13. [Statistical Analysis Recommendations](#statistical-analysis-recommendations)
+14. [Troubleshooting](#troubleshooting)
+15. [Cross-Algorithm Comparison](#cross-algorithm-comparison)
+16. [Key Metrics by Experiment Type](#key-metrics-by-experiment-type)
+17. [Run All Experiments (Complete Suite)](#run-all-experiments-complete-suite)
+18. [Next Steps](#next-steps)
+19. [References](#references)
 
 ## Supported Algorithms
 
@@ -570,6 +581,93 @@ cd experiments/network_partition
 | `./run_partition_trials.sh adaptive-prasle 50 100 60 4` | 100 trials, 4 parallel jobs |
 | `./create-partition-plot.sh -a ring` | Generate plots |
 
+## Experiment Design Recommendations
+
+### For Baseline Metrics
+
+Run multiple trials to account for randomness:
+
+```bash
+# Run 5 trials for each node count
+for nodes in 5 10 50 100; do
+    for trial in {1..5}; do
+        python3 scripts/run_experiment.py \
+            --simulation experiments/convergence/csc_templates/bully/${nodes}nodes.csc \
+            --duration 600 \
+            --output results/bully/trials/${nodes}nodes_trial_${trial} \
+            --algorithm bully
+    done
+done
+```
+
+Then compute aggregate statistics across trials.
+
+### For Scalability Studies
+
+The multi-node experiment suite is designed to evaluate scalability:
+
+```bash
+# Run convergence trials for all node counts
+for nodes in 5 10 50 100; do
+    ./experiments/convergence/run_convergence_trials.sh bully $nodes
+done
+```
+
+This provides data for:
+- **Weak scaling**: Fixed duration, increasing nodes
+- **Performance trends**: How metrics change with network size
+- **Overhead analysis**: Message complexity vs node count
+
+### For Comparison Studies
+
+Keep these parameters constant across experiments:
+- Network topology (dense single-hop for all node counts)
+- Radio model and parameters (100m range, perfect links)
+- Simulation duration (when comparing algorithms)
+- Timing parameters (unless studying their effect)
+
+Vary only:
+- The algorithm being compared
+- Network size (when studying scalability)
+- Specific parameters being evaluated
+
+### Statistical Validity
+
+For publishable results:
+- Run at least **10-100 trials** per configuration
+- Compute mean, median, and standard deviation
+- Use appropriate statistical tests (e.g., t-test, ANOVA)
+- Report confidence intervals
+
+---
+
+## Expected Algorithm Behavior
+
+### Bully Algorithm
+
+Theoretical complexity:
+- **Message complexity**: O(n²) per election in worst case
+- **Time complexity**: O(n) rounds for convergence
+- **Convergence**: Deterministic, guaranteed in asynchronous networks
+
+### Ring Algorithm
+
+Theoretical complexity:
+- **Message complexity**: O(n) messages per election (single ring traversal)
+- **Time complexity**: O(n) message delays for convergence
+- **Convergence**: Deterministic, requires ring topology
+
+### PraSLE Algorithm
+
+Theoretical complexity:
+- **Message complexity**: O(n) per round (probabilistic)
+- **Time complexity**: O(log n) expected rounds for convergence
+- **Convergence**: Probabilistic with high probability, self-stabilizing
+
+Compare experimental results against these theoretical bounds to validate implementation correctness.
+
+---
+
 ## Statistical Analysis Recommendations
 
 For publishable results:
@@ -696,9 +794,199 @@ This generates comparison plots showing:
 - Scalability trends
 - Statistical comparisons with error bars
 
+## Key Metrics by Experiment Type
+
+### Convergence Experiment Key Metrics
+
+1. **Initial Convergence Time**
+   - Time from simulation start to first leader election
+   - Measured in milliseconds
+   - Should be consistent across trials
+
+2. **Message Overhead**
+   - Total messages exchanged during election
+   - Compare against theoretical O(n²) or O(n) bounds
+
+3. **Election Count**
+   - Number of elections before stabilization
+   - Should be minimal (1-3 elections typically)
+
+### Fault Tolerance Key Metrics
+
+1. **Failure Detection Time**
+   - Time from leader crash to detection
+   - Should match configured timeout (e.g., ~20s for Bully)
+
+2. **Re-Election Time**
+   - Time from detection to new leader election
+   - Similar to initial convergence time
+
+3. **Total Recovery Time**
+   - End-to-end: crash → detection → re-election
+   - Critical for service availability
+   - Formula: `timeout + convergence_time`
+
+4. **Success Rate**
+   - Percentage of trials with successful recovery
+   - Should be 100% for robust algorithm
+
+### Noise Experiment Key Metrics
+
+1. **Convergence Time Increase**
+   - How much does packet loss slow convergence?
+   - Expected: Higher packet loss → longer convergence
+   - Measure: % increase vs baseline (0% loss)
+
+2. **Message Overhead**
+   - Total messages sent including retransmissions
+   - Expected: ~(100/success_rate) multiplier
+   - Example: 50% success → ~2x messages
+
+3. **Convergence Success Rate**
+   - Percentage of trials reaching consensus
+   - Should remain high even under noise
+
+4. **Variance/Consistency**
+   - Standard deviation and CV (coefficient of variation)
+   - Higher noise → higher variance expected
+
+### Network Partition Key Metrics
+
+1. **Convergence Time per Partition**
+   - How quickly does each partition elect its leader?
+   - Should be similar to normal election (no interference)
+
+2. **Leader Correctness**
+   - Did each partition elect the highest-priority node?
+   - Expected: 100% correct leader selection
+
+3. **Split-Brain Detection**
+   - Did both partitions elect independent leaders?
+   - Expected: 100% split-brain (by design)
+
+---
+
+## Run All Experiments (Complete Suite)
+
+Use the master script to run all experiments at once:
+
+```bash
+cd examples/leader-election/experiments
+
+# Run ALL experiments for a specific algorithm
+./run_all_experiments.sh --algorithm bully
+
+# Run ALL experiments for all algorithms
+./run_all_experiments.sh --algorithm all
+
+# Run with custom number of trials
+./run_all_experiments.sh --algorithm bully --trials 50
+
+# Run only specific node counts
+./run_all_experiments.sh --algorithm ring --nodes 5,10
+
+# Run only specific experiments
+./run_all_experiments.sh --algorithm prasle --experiments convergence,noise
+
+# Preview what would run (dry run)
+./run_all_experiments.sh --algorithm bully --dry-run
+
+# Full customization
+./run_all_experiments.sh --algorithm all --trials 200 --nodes 50,100 --parallel 8
+```
+
+**Manual execution** (if you prefer running individually):
+
+```bash
+cd examples/leader-election
+
+# Run all convergence trials for all algorithms and node counts
+for algo in bully ring prasle adaptive-prasle; do
+    for nodes in 5 10 50 100; do
+        ./experiments/convergence/run_convergence_trials.sh $algo $nodes
+    done
+done
+
+# Run all crash recovery trials
+for algo in bully ring prasle adaptive-prasle; do
+    for nodes in 5 10 50 100; do
+        ./experiments/fault_tolerance/run_crash_trials.sh $algo $nodes
+    done
+done
+
+# Run all noise trials
+for algo in bully ring prasle adaptive-prasle; do
+    for nodes in 5 10 50 100; do
+        for noise in 90 70 50; do
+            ./experiments/noise/run_noise_trials.sh $algo $nodes $noise
+        done
+    done
+done
+
+# Run all partition trials
+for algo in bully ring prasle adaptive-prasle; do
+    for nodes in 5 10 50 100; do
+        ./experiments/network_partition/run_partition_trials.sh $algo $nodes
+    done
+done
+```
+
+### Generate All Plots
+
+```bash
+cd examples/leader-election/experiments
+
+# Generate ALL plots for all algorithms (auto-detects most recent results)
+./generate_all_plots.sh
+
+# Generate plots for specific algorithm
+./generate_all_plots.sh --algorithm bully
+
+# Generate only specific experiment plots
+./generate_all_plots.sh --experiments convergence,noise
+```
+
+---
+
+## Next Steps
+
+After collecting baseline metrics across all algorithms and node counts:
+
+1. **Analyze scalability**: Compare metrics across 5, 10, 50, and 100 node configurations for each algorithm
+
+2. **Compare algorithms**: Analyze across all implemented algorithms
+   - Convergence time vs network size
+   - Message overhead vs network size
+   - Stability and fault tolerance
+   - Scalability characteristics
+
+3. **Identify trade-offs**: Document algorithm-specific strengths and weaknesses
+   - Bully: Simple, deterministic, but O(n²) messages
+   - Ring: O(n) messages, but requires ring topology
+   - PraSLE: Self-stabilizing, probabilistic convergence
+
+4. **Implement extensions**: Consider algorithm enhancements
+   - Energy-aware leader election
+   - Link-quality-aware priority
+   - Adaptive timeouts based on network conditions
+
+5. **Evaluate extensions**: Compare extended versions vs baselines
+   - Does extension improve convergence time?
+   - What is the overhead cost?
+   - How does it affect fault tolerance?
+
+6. **Publication preparation**:
+   - Generate publication-quality plots
+   - Compute confidence intervals
+   - Perform statistical significance tests
+   - Document methodology and results
+
+---
+
 ## References
 
-- Bully Algorithm: Garcia-Molina, H. (1982). "Elections in a Distributed Computing System"
-- PraSLE: Self-stabilizing probabilistic leader election
-- Contiki-NG Documentation: https://github.com/contiki-ng/contiki-ng
-- Cooja Simulator Guide: Contiki-NG Wiki
+- **Bully Algorithm**: Garcia-Molina, H. (1982). "Elections in a Distributed Computing System"
+- **Ring Algorithm**: Chang, E. and Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes"
+- **PraSLE**: Self-stabilizing probabilistic leader election for wireless sensor networks
+- **Contiki-NG Documentation**: https://github.com/contiki-ng/contiki-ng
+- **Cooja Simulator Guide**: https://docs.contiki-ng.org/en/develop/doc/tutorials/Running-Contiki-NG-in-Cooja.html

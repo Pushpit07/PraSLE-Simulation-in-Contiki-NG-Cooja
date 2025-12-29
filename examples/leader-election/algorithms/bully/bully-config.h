@@ -1,7 +1,4 @@
 /*
- * Copyright (c) 2024, TU Dresden
- * All rights reserved.
- *
  * Bully Algorithm Configuration
  */
 

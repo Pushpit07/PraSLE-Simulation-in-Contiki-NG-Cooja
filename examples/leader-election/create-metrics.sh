@@ -37,7 +37,7 @@ show_usage() {
     echo "Arguments:"
     echo "  algorithm    Algorithm to test: bully, ring, prasle, adaptive-prasle"
     echo "  duration     Duration in seconds (default: 60)"
-    echo "  output_name  Output directory name (default: test)"
+    echo "  output_name  Output directory name (default: metrics)"
     echo ""
     echo "Examples:"
     echo "  $0 bully"
@@ -55,7 +55,7 @@ fi
 
 ALGORITHM=$1
 DURATION=${2:-60}
-OUTPUT_NAME=${3:-"test"}
+OUTPUT_NAME=${3:-"metrics"}
 
 # Validate algorithm
 VALID=false
