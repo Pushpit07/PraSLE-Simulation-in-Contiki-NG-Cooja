@@ -189,9 +189,11 @@ run_trial() {
     fi
 
     # Run Cooja simulation
+    # Note: Cooja uses milliseconds for timeout, but log timestamps are in microseconds
     local duration_ms=$((DURATION * 1000))
-    local crash_time_ms=$((CRASH_TIME * 1000))
+    local crash_time_us=$((CRASH_TIME * 1000000))  # Crash time in microseconds for log comparison
 
+    local crash_time_ms=$((CRASH_TIME * 1000))  # Crash time in ms for COOJA env var
     COOJA_TIMEOUT=$duration_ms CRASH_TIME=$crash_time_ms java --enable-preview -jar "$COOJA_JAR" \
         --no-gui --autostart --contiki="$CONTIKI_DIR" \
         "$temp_csc" > "$log_file" 2>&1 || true
@@ -206,26 +208,29 @@ run_trial() {
 
     if [ -f "$log_file" ]; then
         # Parse convergence times from log
+        # Note: Cooja log timestamps are in MICROSECONDS, we convert to milliseconds
         # Look for "ALL_CONVERGED" or "CONVERGED" messages before and after crash time
-        local first_conv=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | grep -v "^METRICS" | head -1 | grep -oE '^[0-9]+' | head -1)
+        local first_conv_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | grep -v "^METRICS" | head -1 | grep -oE '^[0-9]+' | head -1)
 
-        if [ -n "$first_conv" ] && [ "$first_conv" -lt "$crash_time_ms" ]; then
-            initial_convergence=$first_conv
+        if [ -n "$first_conv_us" ] && [ "$first_conv_us" -lt "$crash_time_us" ]; then
+            # Convert microseconds to milliseconds
+            initial_convergence=$((first_conv_us / 1000))
         fi
 
-        # Find recovery convergence after crash
-        local recovery_conv=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | \
+        # Find recovery convergence after crash (timestamps in microseconds)
+        local recovery_conv_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
-            awk -v crash="$crash_time_ms" '{
+            awk -v crash="$crash_time_us" '{
                 match($0, /^[0-9]+/);
                 if (RSTART == 0) next;
                 time = substr($0, RSTART, RLENGTH);
-                if (time > crash) { print time; exit }
+                if ((time+0) > (crash+0)) { print time; exit }
             }')
 
-        if [ -n "$recovery_conv" ]; then
-            recovery_convergence=$recovery_conv
-            total_recovery=$((recovery_conv - crash_time_ms))
+        if [ -n "$recovery_conv_us" ]; then
+            # Convert microseconds to milliseconds
+            recovery_convergence=$((recovery_conv_us / 1000))
+            total_recovery=$(( (recovery_conv_us - crash_time_us) / 1000 ))
         fi
 
         # Clean up trial directory to save space

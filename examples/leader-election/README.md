@@ -10,6 +10,8 @@ A comprehensive framework for evaluating leader election algorithms in wireless 
 - [Supported Algorithms](#supported-algorithms)
 - [Directory Structure](#directory-structure)
 - [Building](#building)
+  - [Fast Mode (Quick Testing)](#fast-mode-quick-testing)
+  - [Understanding Timing Parameters](#understanding-timing-parameters)
   - [Opening in Cooja GUI](#opening-in-cooja-gui)
 - [Running Experiments](#running-experiments)
   - [Master Experiment Runner](#master-experiment-runner)
@@ -68,13 +70,14 @@ cd examples/leader-election
 ./create-metrics.sh prasle 60              # 1-minute prasle test
 ```
 
-### Step 3: View Results
+### Step 3: Analyze Results
 
 ```bash
-# View the summary
-cat results/bully/metrics/summary.txt
+# Quick analysis with statistics and plots
+./experiments/analyze.sh bully
 
-# View detailed metrics
+# Or view raw results manually
+cat results/bully/metrics/summary.txt
 cat results/bully/metrics/metrics.csv
 
 # Generate plots (requires matplotlib)
@@ -250,6 +253,134 @@ make ALGORITHM=adaptive-prasle TARGET=cooja
 
 # Clean build
 make clean
+```
+
+### Fast Mode (Quick Testing)
+
+For faster convergence times during testing and simulation, use FAST_MODE:
+
+```bash
+# Build with fast timing mode (~1-2 second convergence instead of 5-10 seconds)
+make ALGORITHM=bully TARGET=cooja FAST_MODE=1
+
+# Normal mode (default, conservative timeouts for real wireless networks)
+make ALGORITHM=bully TARGET=cooja
+```
+
+**Timing Comparison:**
+
+| Parameter | Normal Mode | Fast Mode |
+|-----------|-------------|-----------|
+| Election Timeout | 5 seconds | 1 second |
+| Coordinator Timeout | 10 seconds | 4 seconds |
+| Alive Interval | 8 seconds | 2 seconds |
+| Random Delay Max | 5 seconds | 1 second |
+| **Expected Convergence** | 5-10 seconds | 1-2 seconds |
+
+**When to use each mode:**
+- **Fast Mode**: Quick testing, simulation, development iterations
+- **Normal Mode**: Real hardware deployments, realistic wireless network conditions
+
+### Understanding Timing Parameters
+
+Each timing parameter in the Bully algorithm serves a specific purpose. Here's why these values were chosen:
+
+#### 1. RANDOM_DELAY_MAX (Normal: 5s, Fast: 1s)
+
+**Purpose**: Prevents "election storms" when all nodes start simultaneously.
+
+Without this delay, if all nodes boot at the same time:
+1. All nodes would broadcast ELECTION messages simultaneously
+2. All nodes would respond with ANSWER messages simultaneously
+3. Network congestion causes packet loss
+4. Nodes timeout and restart elections → infinite loop
+
+**How it works**: Each node waits a random time (0 to RANDOM_DELAY_MAX) before starting its first election. This staggers the elections so the highest-ID node can "win" before lower-ID nodes even start.
+
+#### 2. ELECTION_TIMEOUT (Normal: 5s, Fast: 1s)
+
+**Purpose**: Time to wait for ANSWER messages after sending an ELECTION.
+
+When a node starts an election:
+1. It broadcasts ELECTION to all higher-ID nodes
+2. It waits ELECTION_TIMEOUT for any ANSWER responses
+3. If no ANSWER received → it wins and becomes coordinator
+4. If ANSWER received → it backs down and waits for COORDINATOR message
+
+**Why 5 seconds in normal mode**: Wireless networks have:
+- Packet loss requiring retransmissions
+- Variable latency due to CSMA backoff
+- Potential interference
+
+5 seconds provides enough margin for messages to be delivered reliably.
+
+#### 3. ALIVE_INTERVAL (Normal: 8s, Fast: 2s)
+
+**Purpose**: How often the coordinator sends heartbeat messages.
+
+Trade-offs:
+- **Too frequent** (e.g., 1s): Wastes bandwidth, drains battery, increases congestion
+- **Too infrequent** (e.g., 30s): Slow failure detection, long periods without confirmation
+
+**Why 8 seconds**: Balances:
+- Reasonable failure detection time (~10-18 seconds worst case)
+- Low network overhead (~7.5 messages/minute)
+- Battery efficiency for sensor networks
+
+#### 4. COORDINATOR_TIMEOUT (Normal: 10s, Fast: 4s)
+
+**Purpose**: How long to wait before declaring the coordinator dead.
+
+**Relationship to ALIVE_INTERVAL**: Should be slightly longer than ALIVE_INTERVAL to account for:
+- Network delays
+- Occasional packet loss
+- Clock drift between nodes
+
+**Why 10 seconds (1.25× ALIVE_INTERVAL)**:
+- If heartbeat arrives on time (8s), we have 2s margin
+- If one heartbeat is lost, we detect failure after ~10s (miss one, timeout waiting for next)
+- Tight enough for quick failover, loose enough to avoid false positives
+
+#### Timing Diagram
+
+```
+Normal Mode Election Timeline:
+═══════════════════════════════════════════════════════════════════════
+
+Node Startup:
+├─────────────────────────────────────────┤
+0s                                      5s (RANDOM_DELAY_MAX)
+   └── Random delay before first election
+
+Election Phase:
+├─────────────────────────────────────────┤
+0s                                      5s (ELECTION_TIMEOUT)
+   └── Send ELECTION, wait for ANSWER responses
+
+Coordinator Heartbeat:
+├────────────────────────────────────────────────────────────────┤
+0s              8s              16s             24s
+│               │               │               │
+└── ALIVE ──────┴── ALIVE ──────┴── ALIVE ──────┴── ALIVE ...
+    (ALIVE_INTERVAL = 8 seconds between heartbeats)
+
+Failure Detection:
+├──────────────────────────────────────────────────────────────────┤
+0s        8s                    18s
+│         │                     │
+│   Last ALIVE received         │
+│         │                     └── COORDINATOR_TIMEOUT expires (10s after last ALIVE)
+│         │                         → Start new election
+│         └── Expected ALIVE (missed due to coordinator crash)
+
+Total Worst-Case Recovery Time:
+├──────────────────────────────────────────────────────────────────┤
+0s                              10s                           15s
+│                               │                             │
+Coordinator crashes             Timeout detected              New leader elected
+                                │                             │
+                                └── 5s RANDOM_DELAY + 5s ELECTION_TIMEOUT
+                                    (But often faster due to staggered delays)
 ```
 
 ### Opening in Cooja GUI
@@ -499,6 +630,36 @@ cd experiments/network_partition/
 ---
 
 ## Analysis Scripts
+
+### Quick Analysis (Recommended)
+
+Use the `analyze.sh` script for easy analysis of experiment results:
+
+```bash
+cd examples/leader-election/experiments
+
+# Interactive mode - shows menu to select algorithm and experiment
+./analyze.sh
+
+# Analyze all experiments for an algorithm
+./analyze.sh bully              # Analyze all bully results
+./analyze.sh ring               # Analyze all ring results
+
+# Analyze specific experiment
+./analyze.sh bully convergence        # Analyze bully convergence
+./analyze.sh ring fault_tolerance     # Analyze ring fault tolerance
+./analyze.sh prasle noise             # Analyze prasle noise experiments
+
+# Analyze all algorithms
+./analyze.sh all                      # Analyze everything
+./analyze.sh all convergence          # Analyze convergence for all algorithms
+```
+
+The script automatically:
+- Finds the latest results for each algorithm/experiment
+- Generates statistical summaries (mean, std dev, median, min, max)
+- Creates plots where applicable
+- Saves analysis outputs alongside the original data
 
 ### Fault Tolerance Analysis
 
@@ -898,15 +1059,17 @@ Leader election algorithms are designed to handle partitions this way:
 **Setup**: Start all nodes within radio range of each other
 
 **Expected Behavior**:
-1. Random startup delays (0-5 seconds) stagger initial elections
+1. Random startup delays stagger initial elections
 2. Multiple elections may occur as nodes discover higher-priority nodes
-3. Highest-ID node becomes coordinator after ~5-10 seconds
+3. Highest-ID node becomes coordinator (Normal mode: ~5-10s, Fast mode: ~1-2s)
 4. Logs show heartbeat messages from coordinator periodically
 5. All nodes receive and acknowledge heartbeat messages
 6. NO further election messages after system stabilizes
 7. System remains stable indefinitely
 
 **Success Criteria**: Single coordinator (highest ID), periodic heartbeats, no election storms
+
+> **Tip**: Use `FAST_MODE=1` during development for quicker iteration. See [Fast Mode](#fast-mode-quick-testing).
 
 ---
 

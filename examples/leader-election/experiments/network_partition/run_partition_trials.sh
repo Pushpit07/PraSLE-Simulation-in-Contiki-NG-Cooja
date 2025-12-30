@@ -239,23 +239,32 @@ run_trial() {
     if [ -f "$log_file" ]; then
         # Parse metrics from log file - look for convergence and leader info per partition
         # This is algorithm-agnostic and relies on log output patterns
+        # Note: Cooja log timestamps are in MICROSECONDS, we convert to milliseconds
 
         # For each partition, find the first convergence message
         # Log format: <timestamp> <node_id> [INFO: ...] <message>
-        # Node ID is field 2 ($2), timestamp is field 1 ($1)
-        partition_a_convergence=$(grep -E "becoming coordinator|New coordinator" "$log_file" 2>/dev/null | \
+        # Node ID is field 2 ($2), timestamp is field 1 ($1) in microseconds
+        local partition_a_us=$(grep -E "becoming coordinator|New coordinator" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_A_MIN" -v max="$PARTITION_A_MAX" '
                 { node_id = $2+0; if (node_id >= min && node_id <= max) { print $1; exit } }
             ' | head -1)
-        [ -z "$partition_a_convergence" ] && partition_a_convergence="NA"
+        if [ -n "$partition_a_us" ]; then
+            partition_a_convergence=$((partition_a_us / 1000))
+        else
+            partition_a_convergence="NA"
+        fi
 
-        partition_b_convergence=$(grep -E "becoming coordinator|New coordinator" "$log_file" 2>/dev/null | \
+        local partition_b_us=$(grep -E "becoming coordinator|New coordinator" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_B_MIN" -v max="$PARTITION_B_MAX" '
                 { node_id = $2+0; if (node_id >= min && node_id <= max) { print $1; exit } }
             ' | head -1)
-        [ -z "$partition_b_convergence" ] && partition_b_convergence="NA"
+        if [ -n "$partition_b_us" ]; then
+            partition_b_convergence=$((partition_b_us / 1000))
+        else
+            partition_b_convergence="NA"
+        fi
 
         # Extract leader for each partition - default to expected highest node if not found
         # Look for "becoming coordinator" messages to find who became leader in each partition

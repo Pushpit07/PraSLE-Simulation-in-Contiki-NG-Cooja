@@ -8,6 +8,39 @@
 /*---------------------------------------------------------------------------*/
 /* TIMING CONFIGURATION - Tuned for wireless sensor networks */
 /*---------------------------------------------------------------------------*/
+/*
+ * Two timing profiles are available:
+ * - Normal mode (default): Conservative timeouts for real wireless networks
+ * - Fast mode (BULLY_FAST_MODE=1): Reduced timeouts for quick testing/simulation
+ *
+ * To enable fast mode: make ALGORITHM=bully TARGET=cooja FAST_MODE=1
+ */
+
+#ifdef BULLY_FAST_MODE
+/*---------------------------------------------------------------------------*/
+/* FAST MODE: Reduced timeouts for testing (~1-2 second convergence) */
+/*---------------------------------------------------------------------------*/
+
+#ifndef ELECTION_TIMEOUT
+#define ELECTION_TIMEOUT    (1 * CLOCK_SECOND)
+#endif
+
+#ifndef COORDINATOR_TIMEOUT
+#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
+#endif
+
+#ifndef ALIVE_INTERVAL
+#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
+#endif
+
+#ifndef RANDOM_DELAY_MAX
+#define RANDOM_DELAY_MAX    (1 * CLOCK_SECOND)
+#endif
+
+#else /* Normal mode */
+/*---------------------------------------------------------------------------*/
+/* NORMAL MODE: Conservative timeouts for real wireless networks */
+/*---------------------------------------------------------------------------*/
 
 /**
  * ELECTION_TIMEOUT: How long to wait for ANSWER responses during election
@@ -19,10 +52,10 @@
 
 /**
  * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
- * - Set to 20 seconds = 2x ALIVE_INTERVAL + buffer
+ * - Set to 10 seconds = ~1.25x ALIVE_INTERVAL (detect missed heartbeat quickly)
  */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (20 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (10 * CLOCK_SECOND)
 #endif
 
 /**
@@ -39,6 +72,8 @@
 #ifndef RANDOM_DELAY_MAX
 #define RANDOM_DELAY_MAX    (5 * CLOCK_SECOND)
 #endif
+
+#endif /* BULLY_FAST_MODE */
 
 /*---------------------------------------------------------------------------*/
 /* MESSAGE TYPES - Bully Algorithm Messages */

@@ -203,13 +203,19 @@ run_trial() {
     local message_count="NA"
 
     if [ -f "$log_file" ]; then
-        # Extract convergence time from ALL_CONVERGED message
+        # Extract convergence time from ALL_CONVERGED message (already in milliseconds)
         convergence_time=$(grep -oE "ALL_CONVERGED,[0-9]+" "$log_file" 2>/dev/null | head -1 | cut -d',' -f2 || echo "NA")
 
-        if [ -z "$convergence_time" ]; then
-            # Try alternative pattern
-            convergence_time=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | \
-                head -1 | grep -oE '[0-9]+' | head -1 || echo "NA")
+        if [ -z "$convergence_time" ] || [ "$convergence_time" = "NA" ]; then
+            # Try alternative pattern - extract timestamp from log line
+            # Note: Cooja log timestamps are in MICROSECONDS, convert to milliseconds
+            local timestamp_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | \
+                head -1 | grep -oE '^[0-9]+' | head -1)
+            if [ -n "$timestamp_us" ]; then
+                convergence_time=$((timestamp_us / 1000))
+            else
+                convergence_time="NA"
+            fi
         fi
 
         # Extract message count from METRICS lines
@@ -222,10 +228,6 @@ run_trial() {
                 }
                 print total
             }' || echo "NA")
-
-        if [ -z "$convergence_time" ] || [ "$convergence_time" = "0" ]; then
-            convergence_time="NA"
-        fi
 
         if [ -z "$message_count" ] || [ "$message_count" = "0" ]; then
             message_count="NA"

@@ -8,13 +8,14 @@
 #   make ALGORITHM=prasle        # Build PraSLE algorithm
 #   make ALGORITHM=adaptive-prasle # Build Customized PraSLE
 #   make clean                   # Clean current algorithm build
-#   make distclean               # Clean all algorithm builds
+#   make clean-all               # Clean all algorithm builds
 #   make all-algorithms          # Build all algorithms
 #
 # Options:
 #   TARGET=cooja                 # Target platform (default: cooja)
 #   ENABLE_METRICS=1             # Enable metrics collection (default: 1)
 #   MAX_NODES=100                # Maximum number of nodes (default: 100)
+#   FAST_MODE=1                  # Enable fast timing mode (reduced timeouts)
 #
 # ============================================================
 
@@ -83,6 +84,12 @@ CFLAGS += -DENABLE_METRICS=$(ENABLE_METRICS)
 MAX_NODES ?= 100
 CFLAGS += -DMAX_NODES=$(MAX_NODES)
 
+# Fast timing mode (reduced timeouts for testing/simulation)
+FAST_MODE ?= 0
+ifeq ($(FAST_MODE),1)
+  CFLAGS += -DBULLY_FAST_MODE=1
+endif
+
 # Include paths
 CFLAGS += -I$(CURDIR)/common
 CFLAGS += -I$(CURDIR)/algorithms/$(ALGORITHM)
@@ -125,8 +132,8 @@ all-algorithms:
 	@echo "All algorithms built successfully!"
 
 # Clean all algorithm builds
-.PHONY: distclean
-distclean:
+.PHONY: clean-all
+clean-all:
 	@echo "Cleaning all algorithm builds..."
 	-$(MAKE) ALGORITHM=bully TARGET=cooja clean 2>/dev/null || true
 	-$(MAKE) ALGORITHM=ring TARGET=cooja clean 2>/dev/null || true
@@ -162,18 +169,20 @@ help:
 	@echo ""
 	@echo "Clean builds:"
 	@echo "  make clean              # Clean current algorithm"
-	@echo "  make distclean          # Clean all algorithms"
+	@echo "  make clean-all          # Clean all algorithms"
 	@echo ""
 	@echo "Options:"
 	@echo "  TARGET=cooja            # Target platform"
 	@echo "  ENABLE_METRICS=1        # Enable metrics (0 or 1)"
 	@echo "  MAX_NODES=100           # Maximum number of nodes"
+	@echo "  FAST_MODE=1             # Fast timing mode (reduced timeouts)"
 	@echo ""
 	@echo "Current configuration:"
 	@echo "  ALGORITHM=$(ALGORITHM)"
 	@echo "  TARGET=$(TARGET)"
 	@echo "  ENABLE_METRICS=$(ENABLE_METRICS)"
 	@echo "  MAX_NODES=$(MAX_NODES)"
+	@echo "  FAST_MODE=$(FAST_MODE)"
 
 # ============================================================
 # Include Contiki-NG Build System

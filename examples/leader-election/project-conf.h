@@ -5,9 +5,19 @@
 #ifndef PROJECT_CONF_H_
 #define PROJECT_CONF_H_
 
-/* Enable IPv6 with RPL routing for multi-hop communication */
+/*---------------------------------------------------------------------------*/
+/* Network Stack Configuration - Algorithm-Specific */
+/*---------------------------------------------------------------------------*/
+/*
+ * Bully algorithm (CURRENT_ALGORITHM == 1): Uses IPv6 with RPL routing
+ * Ring, PraSLE, PraSLE-Custom (2, 3, 4): Use NullNet (no IPv6)
+ */
+#if CURRENT_ALGORITHM == 1  /* Bully uses IPv6 */
 #define NETSTACK_CONF_WITH_IPV6 1
 #define UIP_CONF_ROUTER 1
+#else /* Ring, PraSLE, PraSLE-Custom use nullnet - no IPv6 */
+#define NETSTACK_CONF_WITH_IPV6 0
+#endif
 
 /*---------------------------------------------------------------------------*/
 /* Logging Configuration */
