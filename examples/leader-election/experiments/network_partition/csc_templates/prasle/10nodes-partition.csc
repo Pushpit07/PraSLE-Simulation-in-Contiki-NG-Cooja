@@ -6,8 +6,8 @@
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
       org.contikios.cooja.radiomediums.UDGM
-      <transmitting_range>75.0</transmitting_range>
-      <interference_range>75.0</interference_range>
+      <transmitting_range>198.3</transmitting_range>
+      <interference_range>198.3</interference_range>
       <success_ratio_tx>1.0</success_ratio_tx>
       <success_ratio_rx>1.0</success_ratio_rx>
     </radiomedium>
@@ -107,7 +107,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -120,7 +120,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>70.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -133,7 +133,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>120.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -146,7 +146,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>250.0</y>
+        <y>650.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -159,7 +159,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>70.0</x>
-        <y>250.0</y>
+        <y>650.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>

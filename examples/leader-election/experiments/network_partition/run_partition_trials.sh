@@ -267,19 +267,48 @@ run_trial() {
         fi
 
         # Extract leader for each partition - default to expected highest node if not found
-        # Look for "becoming coordinator" messages to find who became leader in each partition
-        partition_a_leader=$(grep -E "becoming coordinator" "$log_file" 2>/dev/null | \
+        # Look for "becoming coordinator" (self-declaration) and "New coordinator: node X" (acceptance)
+        # Use LAST occurrence to get the final elected leader, not the first
+        #
+        # Log format: "timestamp nodeID [INFO: Bully] message"
+        # - "becoming coordinator" -> node ID is in field 2 (log prefix)
+        # - "New coordinator: node X" -> node ID is at the end of message
+        partition_a_leader=$(grep -E "becoming coordinator|New coordinator:" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_A_MIN" -v max="$PARTITION_A_MAX" '
-                { node_id = $2+0; if (node_id >= min && node_id <= max) { print node_id; exit } }
-            ' | head -1)
+                /becoming coordinator/ {
+                    node_id = $2+0
+                    if (node_id >= min && node_id <= max) last_leader = node_id
+                }
+                /New coordinator: node/ {
+                    # Extract node ID from end of line (after "node ")
+                    n = split($0, parts, "node ")
+                    if (n >= 2) {
+                        node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                END { if (last_leader != "") print last_leader }
+            ')
         [ -z "$partition_a_leader" ] && partition_a_leader="$PARTITION_A_MAX"
 
-        partition_b_leader=$(grep -E "becoming coordinator" "$log_file" 2>/dev/null | \
+        partition_b_leader=$(grep -E "becoming coordinator|New coordinator:" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_B_MIN" -v max="$PARTITION_B_MAX" '
-                { node_id = $2+0; if (node_id >= min && node_id <= max) { print node_id; exit } }
-            ' | head -1)
+                /becoming coordinator/ {
+                    node_id = $2+0
+                    if (node_id >= min && node_id <= max) last_leader = node_id
+                }
+                /New coordinator: node/ {
+                    # Extract node ID from end of line (after "node ")
+                    n = split($0, parts, "node ")
+                    if (n >= 2) {
+                        node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                END { if (last_leader != "") print last_leader }
+            ')
         [ -z "$partition_b_leader" ] && partition_b_leader="$PARTITION_B_MAX"
 
         # Check for split-brain (two different leaders in two partitions)

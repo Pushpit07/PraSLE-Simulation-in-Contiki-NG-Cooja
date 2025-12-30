@@ -36,37 +36,21 @@
 
 #ifdef RING_FAST_MODE
 /*---------------------------------------------------------------------------*/
-/* FAST MODE: Reduced timeouts for testing (~2-4 second convergence) */
+/* FAST MODE: Reduced timeouts for testing (~1-2 second convergence) */
 /*---------------------------------------------------------------------------*/
 
-/**
- * ELECTION_TIMEOUT: Maximum time for election message to complete ring circuit
- * - Fast mode: 4 seconds (suitable for 10-node ring in simulation)
- */
 #ifndef ELECTION_TIMEOUT
-#define ELECTION_TIMEOUT    (4 * CLOCK_SECOND)
+#define ELECTION_TIMEOUT    (1 * CLOCK_SECOND)
 #endif
 
-/**
- * COORDINATOR_TIMEOUT: Time to wait before declaring coordinator dead
- * - Fast mode: 8 seconds (2x ALIVE_INTERVAL)
- */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (8 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
 #endif
 
-/**
- * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat around ring
- * - Fast mode: 4 seconds (time for ALIVE to complete ring circuit)
- */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (4 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
 #endif
 
-/**
- * RANDOM_DELAY_MAX: Random startup delay to prevent synchronized elections
- * - Fast mode: 1 second
- */
 #ifndef RANDOM_DELAY_MAX
 #define RANDOM_DELAY_MAX    (1 * CLOCK_SECOND)
 #endif
@@ -77,51 +61,31 @@
 /*---------------------------------------------------------------------------*/
 
 /**
- * ELECTION_TIMEOUT: Maximum time for election message to complete ring circuit
- *
- * CALCULATION:
- * - Ring size: N nodes
- * - Per-hop delay: ~1-2 seconds (wireless + processing)
- * - Total circuit time: N * 1-2 seconds
- * - Safety margin: 1.5x
- *
- * For 10 nodes: 10 * 1.2s = 12s is reasonable
- * Set to 12 seconds to handle delays and packet loss
+ * ELECTION_TIMEOUT: How long to wait for election to complete
+ * - Set to 5 seconds to handle wireless network delays and packet loss
  */
 #ifndef ELECTION_TIMEOUT
-#define ELECTION_TIMEOUT    (12 * CLOCK_SECOND)
+#define ELECTION_TIMEOUT    (5 * CLOCK_SECOND)
 #endif
 
 /**
  * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
- *
- * DESIGN:
- * - Must be > ALIVE_INTERVAL + ring circuit time
- * - Allows for one missed heartbeat before triggering election
- * - Set to 20 seconds (~1.6x ALIVE_INTERVAL)
+ * - Set to 10 seconds = ~1.25x ALIVE_INTERVAL (detect missed heartbeat quickly)
  */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (20 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (10 * CLOCK_SECOND)
 #endif
 
 /**
- * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat around ring
- *
- * DESIGN:
- * - ALIVE must complete ring circuit before next one is sent
- * - Similar to election circuit time
- * - Set to 12 seconds (full ring circulation time)
+ * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
+ * - Set to 8 seconds to balance failure detection with network traffic
  */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (12 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (8 * CLOCK_SECOND)
 #endif
 
 /**
  * RANDOM_DELAY_MAX: Random startup delay to prevent synchronized elections
- *
- * PURPOSE:
- * - Staggers node startup to prevent all nodes starting elections simultaneously
- * - Reduces collision during initial leader election
  */
 #ifndef RANDOM_DELAY_MAX
 #define RANDOM_DELAY_MAX    (5 * CLOCK_SECOND)

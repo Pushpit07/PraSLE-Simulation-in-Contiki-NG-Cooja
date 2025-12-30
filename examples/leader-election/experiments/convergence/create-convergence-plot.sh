@@ -116,8 +116,9 @@ else
     fi
 fi
 
+ALGORITHM_UPPER=$(echo "$ALGORITHM" | tr '[:lower:]' '[:upper:]')
 echo "=========================================="
-echo " Convergence Distribution Plot - ${ALGORITHM^^}"
+echo " Convergence Distribution Plot - $ALGORITHM_UPPER"
 echo "=========================================="
 echo "Algorithm:  $ALGORITHM"
 echo "Input CSV:  $CSV_FILE"

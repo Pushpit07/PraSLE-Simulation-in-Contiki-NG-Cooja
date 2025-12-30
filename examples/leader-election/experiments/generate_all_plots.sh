@@ -88,8 +88,9 @@ SKIPPED=0
 
 for ALGORITHM in "${ALGO_ARRAY[@]}"; do
     echo ""
+    ALGORITHM_UPPER=$(echo "$ALGORITHM" | tr '[:lower:]' '[:upper:]')
     echo "=============================================================="
-    echo " Algorithm: ${ALGORITHM^^}"
+    echo " Algorithm: $ALGORITHM_UPPER"
     echo "=============================================================="
 
     # ============================================================

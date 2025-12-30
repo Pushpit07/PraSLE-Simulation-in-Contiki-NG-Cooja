@@ -142,9 +142,10 @@ if [[ "$(basename $(dirname "$CSV_FILE"))" =~ ([0-9]+)nodes_noise([0-9]+) ]]; th
 fi
 
 # Display information
+ALGORITHM_UPPER=$(echo "$ALGORITHM" | tr '[:lower:]' '[:upper:]')
 echo ""
 echo "========================================================"
-echo " Generating Network Noise Analysis Plots - ${ALGORITHM^^}"
+echo " Generating Network Noise Analysis Plots - $ALGORITHM_UPPER"
 echo "========================================================"
 echo "Algorithm:     $ALGORITHM"
 echo "Input CSV:     $CSV_FILE"

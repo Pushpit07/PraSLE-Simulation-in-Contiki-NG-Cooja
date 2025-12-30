@@ -267,7 +267,12 @@ def generate_positions_ring(node_count):
 
 
 def generate_positions_partition(node_count):
-    """Generate positions for network partition (two isolated groups)."""
+    """Generate positions for network partition (two isolated groups).
+
+    The two partitions are placed far enough apart that they cannot communicate
+    even with increased radio range for full-mesh connectivity within each partition.
+    Separation of 600 units ensures isolation even with ~380 unit radio range.
+    """
     positions = []
     partition_a, partition_b = PARTITION_CONFIG[node_count]
     a_count = partition_a[1] - partition_a[0] + 1
@@ -281,12 +286,13 @@ def generate_positions_partition(node_count):
         y = 20 + (i // cols_a) * spacing_a
         positions.append((x, y))
 
-    # Position partition B at y=200 (separated by 180 units - outside TX range of 100)
+    # Position partition B at y=600 (separated by ~500+ units - outside max TX range)
+    # This ensures partitions remain isolated even with full-mesh radio range (~380 units)
     cols_b = int(math.ceil(math.sqrt(b_count)))
     spacing_b = max(22, 150 / cols_b)
     for i in range(b_count):
         x = 20 + (i % cols_b) * spacing_b
-        y = 200 + (i // cols_b) * spacing_b
+        y = 600 + (i // cols_b) * spacing_b
         positions.append((x, y))
 
     return positions
@@ -319,15 +325,29 @@ def generate_motes_xml(algorithm, node_count, positions):
 
 
 def get_tx_range(algorithm, node_count, experiment):
-    """Calculate appropriate transmission range."""
+    """Calculate appropriate transmission range.
+
+    For grid layouts (Bully, PraSLE, Adaptive-PraSLE):
+        Radio range must cover the entire grid diagonal for full-mesh connectivity.
+        This ensures all nodes can hear each other for correct leader election.
+
+    For ring layouts:
+        Radio range only needs to reach adjacent nodes in the ring.
+    """
     if algorithm == 'ring':
         radius = 50 + node_count * 2
         arc_length = 2 * math.pi * radius / node_count
         return arc_length * 1.5
     else:
+        # Full-mesh connectivity: radio range must cover entire grid diagonal
+        # This ensures all nodes can hear broadcast messages from any other node
         cols = int(math.ceil(math.sqrt(node_count)))
+        rows = int(math.ceil(node_count / cols))
         spacing = max(30, 200 / cols)
-        return spacing * 1.5
+        grid_width = (cols - 1) * spacing
+        grid_height = (rows - 1) * spacing
+        diagonal = math.sqrt(grid_width**2 + grid_height**2)
+        return diagonal * 1.1  # 10% margin for reliability
 
 
 def get_success_ratio(experiment, noise_level=None):

@@ -171,6 +171,26 @@ This framework supports two network stacks:
 
 **Note**: Link-local multicast (`ff02::1`) only reaches nodes in direct radio range. For multi-hop communication, see the [Advanced: Multi-Hop Routing](#advanced-multi-hop-routing) section.
 
+### Network Topology Requirements
+
+**Important**: The Bully algorithm uses **broadcast** messages for leader election, which requires **single-hop (full-mesh) connectivity** for correct operation. This means all nodes must be within radio range of each other.
+
+**What happens with limited radio range:**
+- If radio range only covers nearby neighbors (not all nodes), election messages don't reach distant nodes
+- Distant high-priority nodes cannot participate in elections they cannot hear
+- The elected leader may not be the globally highest-ID node, only the highest reachable node
+- This is **expected behavior**, not a bug - it demonstrates algorithm limitations in multi-hop networks
+
+**CSC template configuration:**
+- For **5/10 node** configurations: Default radio range (45m) provides full-mesh connectivity
+- For **50/100 node** configurations: Radio range is set to cover the entire grid diagonal (~300-380m)
+- This ensures all nodes can hear each other for correct Bully algorithm operation
+
+**For multi-hop networks** where full-mesh connectivity is not possible:
+- Consider using the Ring algorithm (messages traverse hop-by-hop around the ring)
+- Or implement application-level flooding (see [Advanced: Multi-Hop Routing](#advanced-multi-hop-routing))
+- Or accept partition-tolerant behavior where each reachable group elects its own leader
+
 ## Supported Algorithms
 
 | Algorithm | Description | Network Stack | Documentation |

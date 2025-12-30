@@ -6,8 +6,8 @@
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
       org.contikios.cooja.radiomediums.UDGM
-      <transmitting_range>45.0</transmitting_range>
-      <interference_range>45.0</interference_range>
+      <transmitting_range>304.2</transmitting_range>
+      <interference_range>304.2</interference_range>
       <success_ratio_tx>1.0</success_ratio_tx>
       <success_ratio_rx>1.0</success_ratio_rx>
     </radiomedium>
@@ -367,7 +367,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -380,7 +380,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>50.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -393,7 +393,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>80.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -406,7 +406,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>110.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -419,7 +419,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>140.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -432,7 +432,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>230.0</y>
+        <y>630.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -445,7 +445,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>50.0</x>
-        <y>230.0</y>
+        <y>630.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -458,7 +458,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>80.0</x>
-        <y>230.0</y>
+        <y>630.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -471,7 +471,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>110.0</x>
-        <y>230.0</y>
+        <y>630.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -484,7 +484,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>140.0</x>
-        <y>230.0</y>
+        <y>630.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -497,7 +497,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>260.0</y>
+        <y>660.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -510,7 +510,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>50.0</x>
-        <y>260.0</y>
+        <y>660.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -523,7 +523,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>80.0</x>
-        <y>260.0</y>
+        <y>660.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -536,7 +536,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>110.0</x>
-        <y>260.0</y>
+        <y>660.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -549,7 +549,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>140.0</x>
-        <y>260.0</y>
+        <y>660.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -562,7 +562,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>290.0</y>
+        <y>690.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -575,7 +575,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>50.0</x>
-        <y>290.0</y>
+        <y>690.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -588,7 +588,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>80.0</x>
-        <y>290.0</y>
+        <y>690.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -601,7 +601,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>110.0</x>
-        <y>290.0</y>
+        <y>690.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -614,7 +614,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>140.0</x>
-        <y>290.0</y>
+        <y>690.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -627,7 +627,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>320.0</y>
+        <y>720.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -640,7 +640,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>50.0</x>
-        <y>320.0</y>
+        <y>720.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -653,7 +653,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>80.0</x>
-        <y>320.0</y>
+        <y>720.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -666,7 +666,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>110.0</x>
-        <y>320.0</y>
+        <y>720.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -679,7 +679,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>140.0</x>
-        <y>320.0</y>
+        <y>720.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>

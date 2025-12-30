@@ -68,7 +68,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -81,7 +81,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>95.0</x>
-        <y>200.0</y>
+        <y>600.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -94,7 +94,7 @@
       <interface_config>
         org.contikios.cooja.interfaces.Position
         <x>20.0</x>
-        <y>275.0</y>
+        <y>675.0</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>

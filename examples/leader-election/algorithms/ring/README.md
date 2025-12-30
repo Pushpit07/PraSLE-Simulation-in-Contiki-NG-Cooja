@@ -138,13 +138,15 @@ This implementation uses **NullNet** for lightweight communication:
 
 ## Timing Configuration
 
+Timing is consistent across all algorithms (Bully, Ring, PraSLE).
+
 ### Normal Mode (Default)
 
 | Parameter | Value | Rationale |
 |-----------|-------|-----------|
-| `ELECTION_TIMEOUT` | 12 seconds | Full ring circuit time (N × per-hop delay) |
-| `COORDINATOR_TIMEOUT` | 20 seconds | > ALIVE_INTERVAL + network delays |
-| `ALIVE_INTERVAL` | 12 seconds | Time for heartbeat to complete ring circuit |
+| `ELECTION_TIMEOUT` | 5 seconds | Wait for election responses/completion |
+| `COORDINATOR_TIMEOUT` | 10 seconds | ~1.25x ALIVE_INTERVAL for failure detection |
+| `ALIVE_INTERVAL` | 8 seconds | Balance failure detection with network traffic |
 | `RANDOM_DELAY_MAX` | 5 seconds | Stagger startup to prevent synchronized elections |
 | `RING_SIZE` | 10 | Number of nodes in the ring |
 
@@ -152,9 +154,9 @@ This implementation uses **NullNet** for lightweight communication:
 
 | Parameter | Value |
 |-----------|-------|
-| `ELECTION_TIMEOUT` | 4 seconds |
-| `COORDINATOR_TIMEOUT` | 8 seconds |
-| `ALIVE_INTERVAL` | 4 seconds |
+| `ELECTION_TIMEOUT` | 1 second |
+| `COORDINATOR_TIMEOUT` | 4 seconds |
+| `ALIVE_INTERVAL` | 2 seconds |
 | `RANDOM_DELAY_MAX` | 1 second |
 
 To enable fast mode:
