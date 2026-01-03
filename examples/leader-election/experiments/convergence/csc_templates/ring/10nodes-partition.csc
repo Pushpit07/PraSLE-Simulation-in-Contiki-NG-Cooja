@@ -19,7 +19,7 @@
       <identifier>ring1</identifier>
       <description>RING Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/algorithms/ring/ring-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) -C ../.. ring-node.cooja TARGET=cooja ALGORITHM=ring &amp;&amp; mkdir -p build/cooja &amp;&amp; ln -sf ../../build/cooja/ring-node.cooja build/cooja/</commands>
+      <commands>$(MAKE) -j$(CPUS) -C ../.. ring-node.cooja TARGET=cooja ALGORITHM=ring RING_SIZE=10 &amp;&amp; mkdir -p build/cooja &amp;&amp; ln -sf ../../build/cooja/ring-node.cooja build/cooja/</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/algorithms/ring/build/cooja/ring-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>

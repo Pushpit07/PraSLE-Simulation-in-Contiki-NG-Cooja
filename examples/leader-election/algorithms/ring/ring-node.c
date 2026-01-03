@@ -138,13 +138,14 @@
 
 #include "contiki.h"
 #include "net/netstack.h"
-#include "net/nullnet/nullnet.h"
+#include "net/ipv6/simple-udp.h"
 #include "sys/log.h"
 #include "sys/node-id.h"
 #include "dev/moteid.h"
 #include "random.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 /* Common framework headers */
 #include "election-common.h"
@@ -158,6 +159,23 @@
 /*---------------------------------------------------------------------------*/
 #define LOG_MODULE "Ring"
 #define LOG_LEVEL LOG_LEVEL_INFO
+
+/*---------------------------------------------------------------------------*/
+/* UDP CONFIGURATION */
+/*---------------------------------------------------------------------------*/
+/**
+ * UDP_PORT: Port number for Ring algorithm messages
+ * - All nodes listen on this port for election messages
+ * - Messages are sent to IPv6 multicast address for broadcast
+ */
+#define UDP_PORT ELECTION_UDP_PORT
+
+/**
+ * UDP connection for sending/receiving Ring algorithm messages
+ * - Uses IPv6 link-local multicast (ff02::1) for broadcast-style communication
+ * - Link-local multicast only reaches direct neighbors (single-hop)
+ */
+static struct simple_udp_connection udp_conn;
 
 /*---------------------------------------------------------------------------*/
 /* GLOBAL STATE VARIABLES */
@@ -217,6 +235,50 @@ static bool election_in_progress = false;
  * When true, we're waiting for our ELECTION message to return.
  */
 static bool i_am_initiator = false;
+
+/*---------------------------------------------------------------------------*/
+/* DYNAMIC RING RECONFIGURATION STATE */
+/*---------------------------------------------------------------------------*/
+#if ENABLE_DYNAMIC_RING
+
+/**
+ * Bitmap tracking alive nodes.
+ * Bit i is set if node (i+1) is considered alive.
+ * Supports up to MAX_NODES nodes using a byte array.
+ */
+#define REACHABLE_BITMAP_SIZE ((MAX_NODES + 7) / 8)
+static uint8_t reachable_nodes_bitmap[REACHABLE_BITMAP_SIZE];
+
+/* Macros for bitmap manipulation */
+#define IS_NODE_REACHABLE(node_id) \
+  ((node_id) > 0 && (node_id) <= MAX_NODES && \
+   (reachable_nodes_bitmap[((node_id) - 1) / 8] & (1 << (((node_id) - 1) % 8))))
+
+#define SET_NODE_REACHABLE(node_id) \
+  do { if((node_id) > 0 && (node_id) <= MAX_NODES) \
+       reachable_nodes_bitmap[((node_id) - 1) / 8] |= (1 << (((node_id) - 1) % 8)); } while(0)
+
+#define CLEAR_NODE_REACHABLE(node_id) \
+  do { if((node_id) > 0 && (node_id) <= MAX_NODES) \
+       reachable_nodes_bitmap[((node_id) - 1) / 8] &= ~(1 << (((node_id) - 1) % 8)); } while(0)
+
+/**
+ * Pending message waiting for ACK.
+ * Stores message details for potential retransmission.
+ */
+static struct {
+  bool pending;           /* Is there a pending unacked message? */
+  ring_msg_t msg;         /* Copy of the message */
+  uint8_t retry_count;    /* Number of retries so far */
+  uint16_t ack_seq;       /* Expected ACK sequence */
+} pending_ack = {0};
+
+/**
+ * Monotonically increasing ACK sequence number.
+ */
+static uint16_t ack_sequence_counter = 0;
+
+#endif /* ENABLE_DYNAMIC_RING */
 
 /*---------------------------------------------------------------------------*/
 /* TIMER MANAGEMENT (Global for message handler access) */
@@ -282,6 +344,26 @@ static struct etimer alive_timer;
 static struct etimer metrics_timer;
 #endif
 
+#if ENABLE_DYNAMIC_RING
+/**
+ * ack_timer: Fires after ACK_TIMEOUT
+ *
+ * PURPOSE:
+ * - Detect when ACK not received for ELECTION/COORDINATOR message
+ * - Triggers retry or marks node as failed
+ */
+static struct etimer ack_timer;
+
+/**
+ * recovery_timer: Fires after NODE_RECOVERY_INTERVAL
+ *
+ * PURPOSE:
+ * - Periodically attempt to recover nodes marked as dead
+ * - Allows nodes that come back online to rejoin the ring
+ */
+static struct etimer recovery_timer;
+#endif /* ENABLE_DYNAMIC_RING */
+
 /*---------------------------------------------------------------------------*/
 /* CONTIKI-NG PROCESS DEFINITION */
 /*---------------------------------------------------------------------------*/
@@ -297,6 +379,16 @@ static void send_to_next_node(uint8_t msg_type, uint16_t initiator,
 static void start_election(void);
 static void handle_message(const uint8_t *data, uint16_t len,
                           const linkaddr_t *src);
+
+#if ENABLE_DYNAMIC_RING
+static uint16_t get_next_reachable_node(uint16_t node_id);
+static void mark_node_unreachable(uint16_t node_id);
+static void mark_node_reachable(uint16_t node_id);
+static void send_to_next_node_with_ack(uint8_t msg_type, uint16_t initiator,
+                                       uint16_t candidate, uint16_t sequence);
+static void handle_ack_timeout(void);
+static void send_ack(uint16_t to_node, uint16_t ack_seq);
+#endif /* ENABLE_DYNAMIC_RING */
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -360,6 +452,139 @@ get_next_node(uint16_t node_id)
   }
 }
 
+#if ENABLE_DYNAMIC_RING
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Get the next REACHABLE node in the ring (dynamic version)
+ *
+ * \param node_id Current node's ID
+ * \return ID of the next reachable node in the ring, or 0 if none found
+ *
+ * This function skips nodes marked as unreachable in reachable_nodes_bitmap.
+ * It wraps around the ring up to RING_SIZE times to find a reachable node.
+ */
+/*---------------------------------------------------------------------------*/
+static uint16_t
+get_next_reachable_node(uint16_t node_id)
+{
+  uint16_t candidate = node_id;
+  uint8_t attempts = 0;
+
+  /* Try up to RING_SIZE times to find an alive node */
+  while(attempts < RING_SIZE) {
+    /* Use get_next_node for the basic ring traversal */
+    candidate = get_next_node(candidate);
+
+    /* Skip ourselves */
+    if(candidate == my_node_id) {
+      attempts++;
+      continue;
+    }
+
+    /* Check if this node is alive */
+    if(IS_NODE_REACHABLE(candidate)) {
+      return candidate;
+    }
+
+    attempts++;
+  }
+
+  /* No alive nodes found - we may be isolated */
+  LOG_WARN("No alive nodes found in ring!\n");
+  return 0;
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Mark a node as unreachable (temporarily remove from ring)
+ *
+ * \param node_id Node to mark as unreachable
+ *
+ * After marking a node unreachable, recalculates next_node_id to skip unreachable nodes.
+ */
+/*---------------------------------------------------------------------------*/
+static void
+mark_node_unreachable(uint16_t node_id)
+{
+  if(node_id > 0 && node_id <= MAX_NODES) {
+    CLEAR_NODE_REACHABLE(node_id);
+    LOG_INFO("Node %u marked as UNREACHABLE\n", node_id);
+
+    /* Recalculate next_node_id */
+    next_node_id = get_next_reachable_node(my_node_id);
+    LOG_INFO("Ring reconfigured: new next_node_id = %u\n", next_node_id);
+
+#if ENABLE_METRICS
+    metrics.algo.ring.nodes_marked_unreachable++;
+    metrics.algo.ring.ring_reconfigs++;
+#endif
+  }
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Mark a node as reachable (add back to ring)
+ *
+ * \param node_id Node to mark as reachable
+ *
+ * If the node was previously unreachable, recalculates next_node_id.
+ */
+/*---------------------------------------------------------------------------*/
+static void
+mark_node_reachable(uint16_t node_id)
+{
+  if(node_id > 0 && node_id <= MAX_NODES) {
+    bool was_unreachable = !IS_NODE_REACHABLE(node_id);
+    SET_NODE_REACHABLE(node_id);
+
+    if(was_unreachable) {
+      LOG_INFO("Node %u marked as REACHABLE\n", node_id);
+
+      /* Recalculate next_node_id */
+      next_node_id = get_next_reachable_node(my_node_id);
+      LOG_INFO("Ring reconfigured: new next_node_id = %u\n", next_node_id);
+
+#if ENABLE_METRICS
+      metrics.algo.ring.nodes_recovered++;
+#endif
+    }
+  }
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Send ACK message back to sender
+ *
+ * \param to_node Node to send ACK to
+ * \param ack_seq Sequence number to acknowledge
+ */
+/*---------------------------------------------------------------------------*/
+static void
+send_ack(uint16_t to_node, uint16_t ack_seq)
+{
+  static ring_msg_t ack_msg;
+
+  ack_msg.type = MSG_ACK;
+  ack_msg.initiator_id = my_node_id;
+  ack_msg.candidate_id = 0;
+  ack_msg.sequence = 0;
+  ack_msg.target_node_id = to_node;
+  ack_msg.sender_node_id = my_node_id;
+  ack_msg.ack_sequence = ack_seq;
+
+  LOG_INFO("Sending ACK to node %u (ack_seq=%u)\n", to_node, ack_seq);
+
+  /* Send via UDP to link-local all-nodes multicast address */
+  uip_ipaddr_t dest_addr;
+  uip_create_linklocal_allnodes_mcast(&dest_addr);
+  simple_udp_sendto(&udp_conn, &ack_msg, sizeof(ack_msg), &dest_addr);
+
+#if ENABLE_METRICS
+  metrics.algo.ring.acks_sent++;
+#endif
+}
+#endif /* ENABLE_DYNAMIC_RING */
+
 /*===========================================================================*/
 /*                      MESSAGE HANDLING FUNCTIONS                           */
 /*===========================================================================*/
@@ -381,11 +606,11 @@ get_next_node(uint16_t node_id)
  * HOW IT WORKS:
  * 1. Construct message with all fields
  * 2. Set target_node_id to next_node_id
- * 3. Broadcast via NullNet
+ * 3. Broadcast via UDP multicast
  * 4. Only target node processes the message
  *
  * WHY BROADCAST + FILTERING:
- * - NullNet doesn't support unicast
+ * - Using link-local multicast (ff02::1) for broadcast
  * - All nodes receive the message
  * - target_node_id ensures only intended recipient processes it
  * - This simulates point-to-point ring communication
@@ -404,6 +629,8 @@ send_to_next_node(uint8_t msg_type, uint16_t initiator, uint16_t candidate,
   msg.candidate_id = candidate;
   msg.sequence = sequence;
   msg.target_node_id = next_node_id;  /* Only next node should process */
+  msg.sender_node_id = my_node_id;    /* For ACK routing */
+  msg.ack_sequence = 0;               /* Not using ACK for this send */
 
   /* Log message sending for debugging */
   LOG_INFO("Sending %s to node %u (initiator=%u, candidate=%u, seq=%u)\n",
@@ -431,11 +658,161 @@ send_to_next_node(uint8_t msg_type, uint16_t initiator, uint16_t candidate,
   }
 #endif
 
-  /* Send via NullNet (broadcast, filtered by target_node_id) */
-  nullnet_buf = (uint8_t *)&msg;
-  nullnet_len = sizeof(msg);
-  NETSTACK_NETWORK.output(NULL);  /* NULL = broadcast to all neighbors */
+  /* Send via UDP to link-local all-nodes multicast address */
+  /* Link-local multicast (ff02::1) only reaches direct neighbors (single-hop) */
+  uip_ipaddr_t dest_addr;
+  uip_create_linklocal_allnodes_mcast(&dest_addr);
+  simple_udp_sendto(&udp_conn, &msg, sizeof(msg), &dest_addr);
 }
+
+#if ENABLE_DYNAMIC_RING
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Send message to next node with ACK tracking
+ *
+ * \param msg_type   Type of message (MSG_ELECTION, MSG_COORDINATOR)
+ * \param initiator  Node that originally started this message chain
+ * \param candidate  Current best candidate (highest ID seen)
+ * \param sequence   Sequence number for this election
+ *
+ * For ELECTION and COORDINATOR messages, we track and wait for ACK.
+ * If ACK not received within ACK_TIMEOUT, retry up to MAX_RETRIES times.
+ * After MAX_RETRIES, mark the target node as dead and reconfigure ring.
+ */
+/*---------------------------------------------------------------------------*/
+static void
+send_to_next_node_with_ack(uint8_t msg_type, uint16_t initiator,
+                           uint16_t candidate, uint16_t sequence)
+{
+  /* Check if we have a valid next node */
+  if(next_node_id == 0) {
+    LOG_WARN("No valid next node, cannot send message\n");
+    return;
+  }
+
+  /*
+   * If there's already a pending message waiting for ACK, don't overwrite it.
+   * This prevents reset of retry counter which would delay failure detection.
+   * The current message will complete (success or timeout) and then we can
+   * send the next one. In practice, the election will still converge because
+   * other nodes will forward the message.
+   */
+  if(pending_ack.pending) {
+    LOG_INFO("Pending ACK in progress, deferring send to node %u\n", next_node_id);
+    return;
+  }
+
+  /* Store pending message for potential retransmission */
+  pending_ack.pending = true;
+  pending_ack.msg.type = msg_type;
+  pending_ack.msg.initiator_id = initiator;
+  pending_ack.msg.candidate_id = candidate;
+  pending_ack.msg.sequence = sequence;
+  pending_ack.msg.target_node_id = next_node_id;
+  pending_ack.msg.sender_node_id = my_node_id;
+  pending_ack.msg.ack_sequence = ++ack_sequence_counter;
+  pending_ack.retry_count = 0;
+  pending_ack.ack_seq = ack_sequence_counter;
+
+  /* Send the message */
+  LOG_INFO("Sending %s to node %u with ACK (ack_seq=%u, attempt 1/%d)\n",
+           msg_type == MSG_ELECTION ? "ELECTION" : "COORDINATOR",
+           next_node_id, ack_sequence_counter, MAX_RETRIES);
+
+  /* Send via UDP to link-local all-nodes multicast address */
+  uip_ipaddr_t dest_addr;
+  uip_create_linklocal_allnodes_mcast(&dest_addr);
+  simple_udp_sendto(&udp_conn, &pending_ack.msg, sizeof(ring_msg_t), &dest_addr);
+
+  /* Start ACK timeout timer */
+  etimer_set(&ack_timer, ACK_TIMEOUT);
+
+#if ENABLE_METRICS
+  metrics_track_message_sent(msg_type, sizeof(ring_msg_t));
+  metrics.algo.ring.forwards++;
+
+  if(msg_type == MSG_ELECTION) {
+    metrics.algo.ring.msg_election_sent++;
+  } else if(msg_type == MSG_COORDINATOR) {
+    metrics.algo.ring.msg_coordinator_sent++;
+  }
+#endif
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Handle ACK timeout - retry or mark node failed
+ *
+ * Called when ack_timer expires without receiving ACK.
+ * Implements retry logic and node failure detection.
+ */
+/*---------------------------------------------------------------------------*/
+static void
+handle_ack_timeout(void)
+{
+  if(!pending_ack.pending) {
+    return;
+  }
+
+  pending_ack.retry_count++;
+
+  if(pending_ack.retry_count < MAX_RETRIES) {
+    /* Retry the message */
+    LOG_INFO("ACK timeout, retrying to node %u (attempt %d/%d)\n",
+             pending_ack.msg.target_node_id,
+             pending_ack.retry_count + 1, MAX_RETRIES);
+
+    /* Send via UDP to link-local all-nodes multicast address */
+    uip_ipaddr_t dest_addr;
+    uip_create_linklocal_allnodes_mcast(&dest_addr);
+    simple_udp_sendto(&udp_conn, &pending_ack.msg, sizeof(ring_msg_t), &dest_addr);
+
+    /* Restart ACK timer */
+    etimer_set(&ack_timer, ACK_TIMEOUT);
+
+#if ENABLE_METRICS
+    metrics.algo.ring.retries++;
+#endif
+
+  } else {
+    /* Max retries exceeded - mark node as unreachable */
+    uint16_t unreachable_node = pending_ack.msg.target_node_id;
+    LOG_WARN("Max retries exceeded for node %u, marking as unreachable\n", unreachable_node);
+
+    mark_node_unreachable(unreachable_node);
+    pending_ack.pending = false;
+
+    /* Recalculate next node and resend to new target */
+    if(next_node_id != 0 && next_node_id != unreachable_node) {
+      LOG_INFO("Resending to new next node %u\n", next_node_id);
+
+      /* Update message target and resend */
+      pending_ack.msg.target_node_id = next_node_id;
+      pending_ack.retry_count = 0;
+      pending_ack.ack_seq = ++ack_sequence_counter;
+      pending_ack.msg.ack_sequence = pending_ack.ack_seq;
+      pending_ack.pending = true;
+
+      /* Send via UDP to link-local all-nodes multicast address */
+      uip_ipaddr_t dest_addr2;
+      uip_create_linklocal_allnodes_mcast(&dest_addr2);
+      simple_udp_sendto(&udp_conn, &pending_ack.msg, sizeof(ring_msg_t), &dest_addr2);
+
+      etimer_set(&ack_timer, ACK_TIMEOUT);
+    } else {
+      /*
+       * No valid next node - we can't continue this election/message.
+       * Clear election state so coordinator timeout can trigger a fresh election.
+       * This handles the case where multiple nodes in sequence are unreachable.
+       */
+      LOG_WARN("No valid next node after marking %u unreachable, clearing election state\n",
+               unreachable_node);
+      election_in_progress = false;
+      i_am_initiator = false;
+    }
+  }
+}
+#endif /* ENABLE_DYNAMIC_RING */
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -497,7 +874,11 @@ start_election(void)
    * if their ID is higher. When message returns to us, candidate_id
    * will contain the highest ID in the ring.
    */
+#if ENABLE_DYNAMIC_RING
+  send_to_next_node_with_ack(MSG_ELECTION, my_node_id, my_node_id, election_sequence);
+#else
   send_to_next_node(MSG_ELECTION, my_node_id, my_node_id, election_sequence);
+#endif
 
   /* Caller must set election_timer to detect stuck elections */
 }
@@ -603,6 +984,15 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
          */
         LOG_INFO("Election completed! Winner is node %u\n", msg->candidate_id);
 
+#if ENABLE_DYNAMIC_RING
+        /* IMPORTANT: Send ACK to sender even though message terminates here.
+         * Without this, the sender would keep retrying and eventually mark
+         * us as unreachable, breaking the ring. */
+        if(msg->ack_sequence != 0) {
+          send_ack(msg->sender_node_id, msg->ack_sequence);
+        }
+#endif
+
         /* Update state */
         election_in_progress = false;
         i_am_initiator = false;
@@ -624,8 +1014,13 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
          * initiator_id = my_node_id (we're sending the announcement)
          * candidate_id = current_leader (the winner)
          */
+#if ENABLE_DYNAMIC_RING
+        send_to_next_node_with_ack(MSG_COORDINATOR, my_node_id, current_leader,
+                                   msg->sequence);
+#else
         send_to_next_node(MSG_COORDINATOR, my_node_id, current_leader,
                           msg->sequence);
+#endif
 
         /* If we're the new coordinator, start heartbeat timer */
         if(current_leader == my_node_id) {
@@ -654,6 +1049,15 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
                    msg->candidate_id, my_node_id);
         }
 
+#if ENABLE_DYNAMIC_RING
+        /* Send ACK back to sender to confirm receipt */
+        if(msg->ack_sequence != 0) {
+          send_ack(msg->sender_node_id, msg->ack_sequence);
+          /* Mark sender as alive */
+          mark_node_reachable(msg->sender_node_id);
+        }
+#endif
+
         /* Update our state - we're participating in election */
         state = STATE_ELECTION;
         election_in_progress = true;
@@ -663,8 +1067,13 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
 #endif
 
         /* Forward with original initiator but potentially updated candidate */
+#if ENABLE_DYNAMIC_RING
+        send_to_next_node_with_ack(MSG_ELECTION, msg->initiator_id, new_candidate,
+                                   msg->sequence);
+#else
         send_to_next_node(MSG_ELECTION, msg->initiator_id, new_candidate,
                           msg->sequence);
+#endif
 
         /*
          * PARTITION HEALING (Mechanism 1): Coordinator Re-announcement
@@ -705,6 +1114,15 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
          */
         LOG_INFO("Coordinator announcement completed the ring\n");
 
+#if ENABLE_DYNAMIC_RING
+        /* IMPORTANT: Send ACK to sender even though message terminates here.
+         * Without this, the sender would keep retrying and eventually mark
+         * us as unreachable, breaking the ring. */
+        if(msg->ack_sequence != 0) {
+          send_ack(msg->sender_node_id, msg->ack_sequence);
+        }
+#endif
+
 #if ENABLE_METRICS
         metrics.algo.ring.ring_completions++;
 #endif
@@ -718,6 +1136,15 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
          * then forward the message to continue the ring circuit.
          */
         LOG_INFO("New coordinator announced: node %u\n", msg->candidate_id);
+
+#if ENABLE_DYNAMIC_RING
+        /* Send ACK back to sender to confirm receipt */
+        if(msg->ack_sequence != 0) {
+          send_ack(msg->sender_node_id, msg->ack_sequence);
+          /* Mark sender as alive */
+          mark_node_reachable(msg->sender_node_id);
+        }
+#endif
 
 #if ENABLE_METRICS
         metrics_track_leader_change(msg->candidate_id);
@@ -734,8 +1161,13 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
         etimer_set(&coordinator_timer, COORDINATOR_TIMEOUT);
 
         /* Forward coordinator message to continue ring circuit */
+#if ENABLE_DYNAMIC_RING
+        send_to_next_node_with_ack(MSG_COORDINATOR, msg->initiator_id,
+                                   msg->candidate_id, msg->sequence);
+#else
         send_to_next_node(MSG_COORDINATOR, msg->initiator_id,
                           msg->candidate_id, msg->sequence);
+#endif
       }
       break;
 
@@ -853,6 +1285,41 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
       }
       break;
 
+#if ENABLE_DYNAMIC_RING
+    /* ------------------------------------------------------------------- */
+    case MSG_ACK:
+      /*
+       * ACK MESSAGE RECEIVED
+       *
+       * Confirms that our message was received by the target node.
+       * This proves the node is alive and the message was delivered.
+       */
+      LOG_INFO("Received ACK from node %u (ack_seq=%u)\n",
+               msg->initiator_id, msg->ack_sequence);
+
+      /* Verify this ACK is for our pending message */
+      if(pending_ack.pending && msg->ack_sequence == pending_ack.ack_seq) {
+        LOG_INFO("ACK confirmed, message delivered to node %u\n",
+                 pending_ack.msg.target_node_id);
+
+        pending_ack.pending = false;
+
+        /* Stop ACK timer */
+        etimer_stop(&ack_timer);
+
+        /* Ensure the responding node is marked alive */
+        mark_node_reachable(msg->initiator_id);
+
+#if ENABLE_METRICS
+        metrics.algo.ring.acks_received++;
+#endif
+      } else {
+        LOG_INFO("Unexpected ACK (pending=%d, expected_seq=%u, got_seq=%u)\n",
+                 pending_ack.pending, pending_ack.ack_seq, msg->ack_sequence);
+      }
+      break;
+#endif /* ENABLE_DYNAMIC_RING */
+
     /* ------------------------------------------------------------------- */
     default:
       /* Unknown message type - log and ignore */
@@ -863,22 +1330,30 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
 
 /*---------------------------------------------------------------------------*/
 /**
- * \brief NullNet input callback
+ * \brief UDP input callback
  *
- * This is registered as the NullNet receive callback. It's called whenever
- * a packet is received. We simply forward to our message handler.
+ * This is registered as the UDP receive callback. It's called whenever
+ * a packet is received on our UDP port. We simply forward to our message handler.
  *
- * \param data Received data buffer
- * \param len  Length of received data
- * \param src  Source link-layer address
- * \param dest Destination link-layer address (usually broadcast)
+ * \param c              UDP connection
+ * \param sender_addr    Source IPv6 address
+ * \param sender_port    Source UDP port
+ * \param receiver_addr  Destination IPv6 address
+ * \param receiver_port  Destination UDP port
+ * \param data           Received data buffer
+ * \param datalen        Length of received data
  */
 /*---------------------------------------------------------------------------*/
 static void
-input_callback(const void *data, uint16_t len,
-               const linkaddr_t *src, const linkaddr_t *dest)
+udp_rx_callback(struct simple_udp_connection *c,
+                const uip_ipaddr_t *sender_addr,
+                uint16_t sender_port,
+                const uip_ipaddr_t *receiver_addr,
+                uint16_t receiver_port,
+                const uint8_t *data,
+                uint16_t datalen)
 {
-  handle_message((const uint8_t *)data, len, src);
+  handle_message(data, datalen, NULL);
 }
 
 /*===========================================================================*/
@@ -892,7 +1367,7 @@ input_callback(const void *data, uint16_t len,
  * INITIALIZATION SEQUENCE:
  * 1. Get node ID from Cooja simulator
  * 2. Compute successor (next node in ring)
- * 3. Initialize NullNet for communication
+ * 3. Initialize UDP for communication
  * 4. Initialize metrics infrastructure
  * 5. Random startup delay (prevent synchronized elections)
  * 6. Highest ID node starts initial election
@@ -927,25 +1402,34 @@ PROCESS_THREAD(ring_process, ev, data)
     my_node_id = 1;  /* Ensure non-zero ID (0 is reserved for "no leader") */
   }
 
-  /* Compute our successor in the ring */
+#if ENABLE_DYNAMIC_RING
+  /* Initialize alive bitmap: set first RING_SIZE bits to 1 */
+  memset(reachable_nodes_bitmap, 0, REACHABLE_BITMAP_SIZE);
+  for(uint16_t i = 1; i <= RING_SIZE && i <= MAX_NODES; i++) {
+    SET_NODE_REACHABLE(i);
+  }
+  LOG_INFO("Dynamic ring enabled, initialized %u nodes as reachable\n", RING_SIZE);
+
+  /* Compute our successor in the ring (dynamic version) */
+  next_node_id = get_next_reachable_node(my_node_id);
+#else
+  /* Compute our successor in the ring (static version) */
   next_node_id = get_next_node(my_node_id);
+#endif
 
   LOG_INFO("Ring node %u starting (successor: %u, ring size: %u)\n",
            my_node_id, next_node_id, RING_SIZE);
 
   /*
-   * INITIALIZE NULLNET
+   * INITIALIZE UDP CONNECTION
    *
-   * NullNet is a minimal network layer for Contiki-NG.
-   * - No routing overhead
-   * - Direct broadcast communication
+   * Using IPv6/UDP for communication (same as Bully algorithm).
+   * - Messages sent to link-local multicast (ff02::1) for broadcast
    * - We filter by target_node_id to simulate ring topology
    */
-  nullnet_buf = NULL;
-  nullnet_len = 0;
-  nullnet_set_input_callback(input_callback);
+  simple_udp_register(&udp_conn, UDP_PORT, NULL, UDP_PORT, udp_rx_callback);
 
-  LOG_INFO("NullNet initialized\n");
+  LOG_INFO("UDP connection registered on port %d\n", UDP_PORT);
 
 #if ENABLE_METRICS
   /* Initialize common metrics infrastructure */
@@ -999,6 +1483,11 @@ PROCESS_THREAD(ring_process, ev, data)
   etimer_set(&metrics_timer, METRICS_OUTPUT_INTERVAL);
 #endif
 
+#if ENABLE_DYNAMIC_RING
+  /* Start recovery timer for probing unreachable nodes */
+  etimer_set(&recovery_timer, NODE_RECOVERY_INTERVAL);
+#endif
+
   /*=========================================================================*/
   /* MAIN EVENT LOOP */
   /*=========================================================================*/
@@ -1021,14 +1510,32 @@ PROCESS_THREAD(ring_process, ev, data)
       /*---------------------------------------------------------------------*/
       if(data == &election_timer) {
         /*
-         * ELECTION TIMEOUT
+         * ELECTION TIMER EXPIRED
          *
-         * If we initiated an election and it hasn't completed, the message
-         * might be stuck (ring broken, node failed, etc.).
-         *
-         * Action: Restart election to try again
+         * Two cases:
+         * A) Backoff after coordinator timeout - time to start election
+         * B) Election timeout - message may be stuck, restart
          */
-        if(election_in_progress && i_am_initiator) {
+        if(!election_in_progress && current_leader == 0) {
+          /*
+           * CASE A: BACKOFF COMPLETE - START ELECTION
+           *
+           * The random backoff after coordinator timeout has expired.
+           * Now we can start the election.
+           */
+          LOG_INFO("Backoff complete, starting election now\n");
+          start_election();
+          etimer_set(&election_timer, ELECTION_TIMEOUT);
+
+        } else if(election_in_progress && i_am_initiator) {
+          /*
+           * CASE B: ELECTION TIMEOUT
+           *
+           * We initiated an election and it hasn't completed. The message
+           * might be stuck (ring broken, node failed, etc.).
+           *
+           * Action: Restart election to try again
+           */
           LOG_INFO("Election timeout - message may be stuck, restarting\n");
 
 #if ENABLE_METRICS
@@ -1074,7 +1581,7 @@ PROCESS_THREAD(ring_process, ev, data)
           start_election();
           etimer_set(&election_timer, ELECTION_TIMEOUT);
 
-        } else if(current_leader != my_node_id && !election_in_progress) {
+        } else if(current_leader != my_node_id) {
           /* We have a leader but haven't heard from them - they may be dead */
           LOG_INFO("Coordinator %u timeout, starting new election\n",
                    current_leader);
@@ -1083,11 +1590,54 @@ PROCESS_THREAD(ring_process, ev, data)
           metrics_track_timeout();
 #endif
 
+          /*
+           * IMPORTANT: Clear stale election state before starting new election
+           *
+           * If a previous election was in progress but got stuck (e.g., message
+           * lost or target node crashed), we need to clear that state.
+           * Otherwise, we'd be blocked from starting a new election forever.
+           */
+          if(election_in_progress) {
+            LOG_INFO("Clearing stale election state (was in_progress=%d, initiator=%d)\n",
+                     election_in_progress, i_am_initiator);
+          }
+          election_in_progress = false;
+          i_am_initiator = false;
+#if ENABLE_DYNAMIC_RING
+          pending_ack.pending = false;  /* Clear any pending ACK wait */
+#endif
+
           current_leader = 0;  /* Clear old leader */
-          start_election();
-          etimer_set(&election_timer, ELECTION_TIMEOUT);
+
+          /*
+           * RANDOM BACKOFF: Add random delay before starting election
+           *
+           * When coordinator fails, all nodes detect failure around the same time
+           * and try to start elections. This causes network congestion and packet
+           * drops. To mitigate this, add a random delay based on node ID.
+           *
+           * Higher ID nodes wait less (they're more likely to win anyway).
+           * For scalability, we cap the maximum backoff at 2 seconds to avoid
+           * excessive delays in large networks (100+ nodes).
+           *
+           * Delay formula: min(2s, (RING_SIZE - my_node_id) * 20ms) + random(0-200ms)
+           */
+          {
+            /* Calculate priority-based backoff: lower IDs wait longer (but capped) */
+            clock_time_t priority_delay = (RING_SIZE - my_node_id) * CLOCK_SECOND / 50;
+            clock_time_t max_priority_delay = 2 * CLOCK_SECOND;  /* Cap at 2 seconds */
+            if(priority_delay > max_priority_delay) {
+              priority_delay = max_priority_delay;
+            }
+            clock_time_t backoff = priority_delay + (random_rand() % (CLOCK_SECOND / 5));
+            LOG_INFO("Random backoff before election: %lu ms\n",
+                     (unsigned long)(backoff * 1000 / CLOCK_SECOND));
+
+            /* Set election timer with backoff - when it fires, start_election will be called */
+            etimer_set(&election_timer, backoff);
+          }
         }
-        /* else: We are coordinator or election in progress - do nothing */
+        /* else: We are coordinator - do nothing */
 
         /* Reset timer for next check period */
         etimer_reset(&coordinator_timer);
@@ -1130,6 +1680,51 @@ PROCESS_THREAD(ring_process, ev, data)
         etimer_reset(&metrics_timer);
       }
 #endif
+
+#if ENABLE_DYNAMIC_RING
+      /*---------------------------------------------------------------------*/
+      /* ACK TIMER EXPIRED */
+      /*---------------------------------------------------------------------*/
+      else if(data == &ack_timer) {
+        /*
+         * ACK TIMEOUT
+         *
+         * We didn't receive ACK for our pending message.
+         * Either retry or mark the target node as dead.
+         */
+        handle_ack_timeout();
+      }
+
+      /*---------------------------------------------------------------------*/
+      /* RECOVERY TIMER EXPIRED */
+      /*---------------------------------------------------------------------*/
+      else if(data == &recovery_timer) {
+        /*
+         * NODE RECOVERY CHECK
+         *
+         * Periodically attempt to recover nodes that were marked as unreachable.
+         * This allows nodes that come back online (partition heals) to rejoin the ring.
+         *
+         * Strategy: Try to communicate with nodes marked as unreachable.
+         * If they respond, mark_node_reachable() will be called.
+         */
+        LOG_INFO("Recovery timer: checking for recovered nodes\n");
+
+        /* Find an unreachable node to probe */
+        for(uint16_t i = 1; i <= RING_SIZE; i++) {
+          if(i != my_node_id && !IS_NODE_REACHABLE(i)) {
+            /* This node is marked unreachable - try to probe it */
+            LOG_INFO("Probing potentially recovered node %u\n", i);
+            /* Re-add to bitmap tentatively - if no response, it will
+             * be marked unreachable again by ACK timeout mechanism */
+            mark_node_reachable(i);
+            break;  /* Only probe one node per recovery cycle */
+          }
+        }
+
+        etimer_reset(&recovery_timer);
+      }
+#endif /* ENABLE_DYNAMIC_RING */
     }
     /* Messages are handled via input_callback -> handle_message() */
   }

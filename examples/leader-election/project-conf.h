@@ -10,12 +10,13 @@
 /*---------------------------------------------------------------------------*/
 /*
  * Bully algorithm (CURRENT_ALGORITHM == 1): Uses IPv6 with RPL routing
- * Ring, PraSLE, PraSLE-Custom (2, 3, 4): Use NullNet (no IPv6)
+ * Ring algorithm (CURRENT_ALGORITHM == 2): Uses IPv6 with RPL routing
+ * PraSLE, PraSLE-Custom (3, 4): Use NullNet (no IPv6)
  */
-#if CURRENT_ALGORITHM == 1  /* Bully uses IPv6 */
+#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2  /* Bully and Ring use IPv6 */
 #define NETSTACK_CONF_WITH_IPV6 1
 #define UIP_CONF_ROUTER 1
-#else /* Ring, PraSLE, PraSLE-Custom use nullnet - no IPv6 */
+#else /* PraSLE, PraSLE-Custom use nullnet - no IPv6 */
 #define NETSTACK_CONF_WITH_IPV6 0
 #endif
 
@@ -34,7 +35,7 @@
 /* Network Configuration - Algorithm-Specific */
 /*---------------------------------------------------------------------------*/
 
-#if CURRENT_ALGORITHM == 1  /* Bully uses IPv6 */
+#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2  /* Bully and Ring use IPv6 */
 
 /* UDP Configuration */
 #define UIP_CONF_UDP                               1
@@ -53,7 +54,7 @@
 #define RPL_CONF_DIO_INTERVAL_DOUBLINGS            8
 #define RPL_CONF_DIO_REDUNDANCY                    10
 
-#else /* Ring, PraSLE, PraSLE-Custom use nullnet */
+#else /* PraSLE, PraSLE-Custom use nullnet */
 
 /* No UIP for nullnet-based algorithms */
 #define UIP_CONF_UDP                               0

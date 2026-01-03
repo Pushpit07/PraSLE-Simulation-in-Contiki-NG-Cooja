@@ -103,6 +103,13 @@ typedef struct {
       uint32_t msg_election_recv;          /* ELECTION messages received */
       uint32_t msg_coordinator_recv;       /* COORDINATOR messages received */
       uint32_t msg_alive_recv;             /* ALIVE messages received */
+      /* Dynamic ring reconfiguration metrics */
+      uint32_t acks_sent;                  /* ACK messages sent */
+      uint32_t acks_received;              /* ACK messages received */
+      uint32_t retries;                    /* Message retries due to ACK timeout */
+      uint32_t nodes_marked_unreachable;   /* Nodes marked as unreachable */
+      uint32_t nodes_recovered;            /* Nodes recovered/rejoined ring */
+      uint32_t ring_reconfigs;             /* Ring reconfiguration events */
     } ring;
 
     /* PraSLE Algorithm Specific */
@@ -235,7 +242,9 @@ void metrics_track_heartbeat_recv(void);
 #define METRICS_CSV_HEADER_RING \
   ",ring_completions,forwards," \
   "msg_election_sent,msg_coordinator_sent,msg_alive_sent," \
-  "msg_election_recv,msg_coordinator_recv,msg_alive_recv"
+  "msg_election_recv,msg_coordinator_recv,msg_alive_recv," \
+  "acks_sent,acks_received,retries," \
+  "nodes_marked_unreachable,nodes_recovered,ring_reconfigs"
 
 /* PraSLE-specific header columns */
 #define METRICS_CSV_HEADER_PRASLE \

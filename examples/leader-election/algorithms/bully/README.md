@@ -47,11 +47,11 @@ This implementation uses **IPv6 with RPL Lite routing** for communication:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `ELECTION_TIMEOUT` | 5 seconds | Time to wait for ANSWER messages during election |
-| `COORDINATOR_TIMEOUT` | 20 seconds | Time to wait for COORDINATOR announcement or detect leader failure |
+| `COORDINATOR_TIMEOUT` | 10 seconds | Time to wait for COORDINATOR announcement or detect leader failure |
 | `ALIVE_INTERVAL` | 8 seconds | Interval for leader heartbeat messages |
 | `RANDOM_DELAY_MAX` | 5 seconds | Maximum random startup delay |
 
-**Important**: `COORDINATOR_TIMEOUT` must be > 2x `ALIVE_INTERVAL` to prevent false-positive leader failures.
+**Important**: `COORDINATOR_TIMEOUT` should be > `ALIVE_INTERVAL` to prevent false-positive leader failures (currently 1.25x).
 
 ## Message Structure
 
@@ -187,13 +187,13 @@ if (sender_id >= my_node_id) {
 
 **Expected Behavior**:
 1. ALIVE messages from coordinator stop
-2. After ~20 seconds (COORDINATOR_TIMEOUT), nodes detect failure
+2. After ~10 seconds (COORDINATOR_TIMEOUT), nodes detect failure
 3. Nodes log "Coordinator timeout - no ALIVE received, starting election"
 4. Next highest-ID node wins election and becomes new coordinator
 5. New coordinator begins sending ALIVE messages every 8 seconds
 6. System stabilizes with new leader
 
-**Success Criteria**: Clean failover within 20-25 seconds, no election storms
+**Success Criteria**: Clean failover within 10-15 seconds, no election storms
 
 ---
 
@@ -265,7 +265,7 @@ if (sender_id >= my_node_id) {
 4. Restart original highest-ID node -> Wait for system to reconverge
 
 **Expected Behavior**:
-1. Each failure triggers election within 20 seconds
+1. Each failure triggers election within 10 seconds
 2. Next highest-priority node becomes coordinator
 3. When original leader restarts, it initiates election
 4. System recognizes it as highest priority and elects it

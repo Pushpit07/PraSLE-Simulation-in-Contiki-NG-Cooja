@@ -6,8 +6,8 @@
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
       org.contikios.cooja.radiomediums.UDGM
-      <transmitting_range>113.1</transmitting_range>
-      <interference_range>113.1</interference_range>
+      <transmitting_range>150.0</transmitting_range>
+      <interference_range>150.0</interference_range>
       <success_ratio_tx>0.5</success_ratio_tx>
       <success_ratio_rx>0.5</success_ratio_rx>
     </radiomedium>
@@ -19,7 +19,7 @@
       <identifier>ring1</identifier>
       <description>RING Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/ring-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) ring-node.cooja TARGET=cooja ALGORITHM=ring</commands>
+      <commands>$(MAKE) -j$(CPUS) ring-node.cooja TARGET=cooja ALGORITHM=ring RING_SIZE=5</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/build/cooja/ring-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>

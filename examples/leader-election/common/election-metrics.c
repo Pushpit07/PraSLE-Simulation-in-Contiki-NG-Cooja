@@ -150,10 +150,19 @@ metrics_output(void)
          (unsigned long)metrics.algo.ring.msg_election_sent,
          (unsigned long)metrics.algo.ring.msg_coordinator_sent,
          (unsigned long)metrics.algo.ring.msg_alive_sent);
-  printf("%lu,%lu,%lu",
+  printf("%lu,%lu,%lu,",
          (unsigned long)metrics.algo.ring.msg_election_recv,
          (unsigned long)metrics.algo.ring.msg_coordinator_recv,
          (unsigned long)metrics.algo.ring.msg_alive_recv);
+  /* Dynamic ring reconfiguration metrics */
+  printf("%lu,%lu,%lu,",
+         (unsigned long)metrics.algo.ring.acks_sent,
+         (unsigned long)metrics.algo.ring.acks_received,
+         (unsigned long)metrics.algo.ring.retries);
+  printf("%lu,%lu,%lu",
+         (unsigned long)metrics.algo.ring.nodes_marked_unreachable,
+         (unsigned long)metrics.algo.ring.nodes_recovered,
+         (unsigned long)metrics.algo.ring.ring_reconfigs);
 
 #elif CURRENT_ALGORITHM == ALGORITHM_PRASLE || CURRENT_ALGORITHM == ALGORITHM_PRASLE_CUSTOM
   printf(",%ld,%ld,%u,%lu,%lu",

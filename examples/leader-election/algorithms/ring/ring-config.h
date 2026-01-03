@@ -62,7 +62,9 @@
 
 /**
  * ELECTION_TIMEOUT: How long to wait for election to complete
- * - Set to 5 seconds to handle wireless network delays and packet loss
+ * - Set to 5 seconds to allow for larger networks and retransmissions
+ * - Should be long enough for election to traverse the ring
+ * - For 100-node networks, elections may need multiple retries
  */
 #ifndef ELECTION_TIMEOUT
 #define ELECTION_TIMEOUT    (5 * CLOCK_SECOND)
@@ -70,18 +72,20 @@
 
 /**
  * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
- * - Set to 10 seconds = ~1.25x ALIVE_INTERVAL (detect missed heartbeat quickly)
+ * - Set to 6 seconds for faster failure detection
+ * - Should be greater than ALIVE_INTERVAL to avoid false positives
  */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (10 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (6 * CLOCK_SECOND)
 #endif
 
 /**
  * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
- * - Set to 8 seconds to balance failure detection with network traffic
+ * - Set to 4 seconds for more frequent heartbeats
+ * - Enables faster failure detection
  */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (8 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (4 * CLOCK_SECOND)
 #endif
 
 /**
@@ -130,10 +134,60 @@
  *   - Sent periodically by coordinator around the ring
  *   - Proves coordinator is still functioning
  *   - Nodes reset their coordinator_timer upon receipt
+ *
+ * MSG_ACK (4): Acknowledgment message for dynamic ring reconfiguration
+ *   - Confirms receipt of ELECTION or COORDINATOR messages
+ *   - Used to detect failed nodes and reconfigure the ring
  */
 #define MSG_ELECTION    1
 #define MSG_COORDINATOR 2
 #define MSG_ALIVE       3
+#define MSG_ACK         4
+
+/*---------------------------------------------------------------------------*/
+/* DYNAMIC RING RECONFIGURATION CONFIGURATION */
+/*---------------------------------------------------------------------------*/
+/*
+ * Enable/disable dynamic ring reconfiguration.
+ * When enabled, the ring algorithm can detect failed nodes and
+ * automatically reconfigure the ring topology to skip them.
+ */
+#ifndef ENABLE_DYNAMIC_RING
+#define ENABLE_DYNAMIC_RING 1
+#endif
+
+#if ENABLE_DYNAMIC_RING
+
+/**
+ * ACK_TIMEOUT: How long to wait for acknowledgment of ELECTION/COORDINATOR
+ * - Should be short enough for quick failure detection
+ * - But long enough to allow for network delays
+ * - Set to 500ms for fast failure detection in simulations
+ */
+#ifndef ACK_TIMEOUT
+#define ACK_TIMEOUT         (CLOCK_SECOND / 2)
+#endif
+
+/**
+ * MAX_RETRIES: Number of retries before marking a node as unreachable
+ * - After MAX_RETRIES failed attempts, node is marked unreachable
+ * - Ring is reconfigured to skip the unreachable node
+ * - Reduced to 2 for faster failure detection (total wait: 1s per failed node)
+ */
+#ifndef MAX_RETRIES
+#define MAX_RETRIES         2
+#endif
+
+/**
+ * NODE_RECOVERY_INTERVAL: How often to probe unreachable nodes for recovery
+ * - Unreachable nodes may come back online (partition heals, node restarts)
+ * - Periodic probing allows them to rejoin the ring
+ */
+#ifndef NODE_RECOVERY_INTERVAL
+#define NODE_RECOVERY_INTERVAL (30 * CLOCK_SECOND)
+#endif
+
+#endif /* ENABLE_DYNAMIC_RING */
 
 /*---------------------------------------------------------------------------*/
 /* NODE STATE MACHINE */
@@ -174,11 +228,12 @@ typedef enum {
  * Ring algorithm message structure
  *
  * FIELDS:
- *   type:           Message type (MSG_ELECTION, MSG_COORDINATOR, MSG_ALIVE)
+ *   type:           Message type (MSG_ELECTION, MSG_COORDINATOR, MSG_ALIVE, MSG_ACK)
  *   initiator_id:   Node that originally started this message chain
  *                   - For ELECTION: Node that started the election
  *                   - For COORDINATOR: Node that won the election
  *                   - For ALIVE: The coordinator
+ *                   - For ACK: Node sending the acknowledgment
  *   candidate_id:   Current best candidate (highest ID seen so far)
  *                   - Updated as message traverses the ring
  *                   - When message returns to initiator, this is the winner
@@ -188,17 +243,23 @@ typedef enum {
  *   target_node_id: Which node should process this message
  *                   - Set to next node in ring
  *                   - Receivers filter based on this field
+ *   sender_node_id: Node that sent this message (for ACK routing)
+ *                   - Used to route ACK back to the sender
+ *   ack_sequence:   ACK correlation sequence number
+ *                   - Used to match ACK with pending message
  *
- * MESSAGE SIZE: 9 bytes total
+ * MESSAGE SIZE: 13 bytes total
  *   - Compact for efficient wireless transmission
- *   - Includes all necessary information for ring algorithm
+ *   - Includes all necessary information for ring algorithm with dynamic reconfiguration
  */
 typedef struct {
-  uint8_t type;             /* Message type identifier (1-3) */
+  uint8_t type;             /* Message type identifier (1-4) */
   uint16_t initiator_id;    /* Node that started this message chain */
   uint16_t candidate_id;    /* Current best candidate (highest ID) */
   uint16_t sequence;        /* Sequence number for this election */
   uint16_t target_node_id;  /* Next node in ring to process message */
+  uint16_t sender_node_id;  /* Node that sent this message (for ACK routing) */
+  uint16_t ack_sequence;    /* ACK correlation sequence number */
 } ring_msg_t;
 
 #endif /* RING_CONFIG_H_ */

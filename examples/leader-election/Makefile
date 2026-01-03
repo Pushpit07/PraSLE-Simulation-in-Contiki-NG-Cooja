@@ -54,8 +54,8 @@ ifeq ($(ALGORITHM),bully)
   MAKE_ROUTING = MAKE_ROUTING_RPL_LITE
 else ifeq ($(ALGORITHM),ring)
   ALGORITHM_ID = 2
-  MAKE_NET = MAKE_NET_NULLNET
-  MAKE_ROUTING = MAKE_ROUTING_NULLROUTING
+  MAKE_NET = MAKE_NET_IPV6
+  MAKE_ROUTING = MAKE_ROUTING_RPL_LITE
 else ifeq ($(ALGORITHM),prasle)
   ALGORITHM_ID = 3
   MAKE_NET = MAKE_NET_NULLNET
@@ -88,6 +88,11 @@ CFLAGS += -DMAX_NODES=$(MAX_NODES)
 FAST_MODE ?= 0
 ifeq ($(FAST_MODE),1)
   CFLAGS += -DBULLY_FAST_MODE=1
+endif
+
+# Ring size (number of nodes in ring topology, ring algorithm only)
+ifdef RING_SIZE
+  CFLAGS += -DRING_SIZE=$(RING_SIZE)
 endif
 
 # Include paths

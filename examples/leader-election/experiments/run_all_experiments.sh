@@ -276,18 +276,44 @@ print_header "Running Experiments"
 
 START_TIME=$(date +%s)
 
+# Get experiment duration based on algorithm and node count
+# Ring algorithm needs longer duration for large networks due to O(n) message complexity
+get_experiment_duration() {
+    local algo=$1
+    local nodes=$2
+    local experiment=$3
+
+    if [[ "$algo" == "ring" ]]; then
+        case $nodes in
+            50)  echo 120 ;;  # 2 minutes for 50 nodes
+            100) echo 180 ;;  # 3 minutes for 100 nodes
+            *)   echo 60 ;;   # 1 minute for smaller rings
+        esac
+    else
+        echo 60  # Default 1 minute for other algorithms
+    fi
+}
+
 for algo in "${ALGORITHMS[@]}"; do
     for exp in "${EXPERIMENTS_ARRAY[@]}"; do
         for nodes in "${NODES_ARRAY[@]}"; do
             echo ""
             print_info "Running $exp experiment for $algo with $nodes nodes"
 
+            # Ring algorithm needs clean build for each RING_SIZE
+            if [[ "$algo" == "ring" && "$DRY_RUN" != "true" ]]; then
+                rm -rf "$PROJECT_DIR/build" 2>/dev/null || true
+            fi
+
+            # Get appropriate duration for this algorithm and node count
+            DURATION=$(get_experiment_duration "$algo" "$nodes" "$exp")
+
             if [[ "$DRY_RUN" != "true" ]]; then
                 case $exp in
                     convergence)
                         if [[ -x "$SCRIPT_DIR/convergence/run_convergence_trials.sh" ]]; then
                             "$SCRIPT_DIR/convergence/run_convergence_trials.sh" \
-                                "$algo" "$nodes" "$NUM_TRIALS" 60 "$PARALLEL_JOBS"
+                                "$algo" "$nodes" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
                         else
                             print_warn "Convergence trial script not found, skipping..."
                         fi
@@ -306,7 +332,7 @@ for algo in "${ALGORITHMS[@]}"; do
                             for noise_level in 50 70 90; do
                                 print_info "Running noise experiment with ${noise_level}% success rate"
                                 "$SCRIPT_DIR/noise/run_noise_trials.sh" \
-                                    "$algo" "$nodes" "$noise_level" "$NUM_TRIALS" 60 "$PARALLEL_JOBS"
+                                    "$algo" "$nodes" "$noise_level" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
                             done
                         else
                             print_warn "Noise trial script not found, skipping..."
@@ -315,7 +341,7 @@ for algo in "${ALGORITHMS[@]}"; do
                     network_partition)
                         if [[ -x "$SCRIPT_DIR/network_partition/run_partition_trials.sh" ]]; then
                             "$SCRIPT_DIR/network_partition/run_partition_trials.sh" \
-                                "$algo" "$nodes" "$NUM_TRIALS" 60 "$PARALLEL_JOBS"
+                                "$algo" "$nodes" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
                         else
                             print_warn "Network partition trial script not found, skipping..."
                         fi
