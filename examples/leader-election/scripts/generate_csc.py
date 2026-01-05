@@ -57,7 +57,7 @@ CSC_TEMPLATE = '''<?xml version="1.0" encoding="UTF-8"?>
       <identifier>{algorithm}1</identifier>
       <description>{algorithm_upper} Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/{algorithm}-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) {algorithm}-node.cooja TARGET=cooja ALGORITHM={algorithm}</commands>
+      <commands>$(MAKE) -j$(CPUS) {algorithm}-node.cooja TARGET=cooja ALGORITHM={algorithm}{fast_mode_flag}</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/build/cooja/{algorithm}-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>
@@ -400,7 +400,7 @@ def get_output_filename(node_count, experiment, noise_level=None):
 
 
 def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
-                 noise_level=None):
+                 noise_level=None, fast_mode=False):
     """Generate a single CSC file."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -412,6 +412,9 @@ def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
     title = get_title(algorithm, node_count, experiment, noise_level)
     script = get_script(algorithm, experiment)
 
+    # Add FAST_MODE=1 flag if requested
+    fast_mode_flag = " FAST_MODE=1" if fast_mode else ""
+
     content = CSC_TEMPLATE.format(
         title=title,
         algorithm=algorithm,
@@ -422,7 +425,8 @@ def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
         int_range=f"{tx_range:.1f}",
         success_tx=success_tx,
         success_rx=success_rx,
-        script=script
+        script=script,
+        fast_mode_flag=fast_mode_flag
     )
 
     output_filename = get_output_filename(node_count, experiment, noise_level)
@@ -433,7 +437,7 @@ def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
 
 
 def generate_all_for_experiment(output_base, experiment, algorithms=None,
-                                 node_counts=None, noise_levels=None):
+                                 node_counts=None, noise_levels=None, fast_mode=False):
     """Generate all CSC files for a specific experiment type."""
     algorithms = algorithms or ALGORITHMS
     node_counts = node_counts or NODE_COUNTS
@@ -446,11 +450,11 @@ def generate_all_for_experiment(output_base, experiment, algorithms=None,
             if experiment == 'noise':
                 for nl in noise_levels:
                     output_dir = Path(output_base) / algo
-                    generate_csc(algo, nc, output_dir, experiment, nl)
+                    generate_csc(algo, nc, output_dir, experiment, nl, fast_mode)
                     generated += 1
             else:
                 output_dir = Path(output_base) / algo
-                generate_csc(algo, nc, output_dir, experiment)
+                generate_csc(algo, nc, output_dir, experiment, fast_mode=fast_mode)
                 generated += 1
 
     return generated
@@ -481,6 +485,8 @@ Examples:
                         help='Experiment type (default: convergence)')
     parser.add_argument('--noise-level', type=int, choices=NOISE_LEVELS,
                         help='Noise level for noise experiments (50, 70, 90)')
+    parser.add_argument('--fast-mode', '-f', action='store_true',
+                        help='Enable FAST_MODE in build commands for faster convergence')
     parser.add_argument('--all', action='store_true',
                         help='Generate all combinations')
 
@@ -494,10 +500,12 @@ Examples:
     total_generated = 0
 
     for exp in experiments:
-        print(f"\n=== Generating {exp} CSC files ===")
+        mode_str = " (FAST_MODE)" if args.fast_mode else ""
+        print(f"\n=== Generating {exp} CSC files{mode_str} ===")
         count = generate_all_for_experiment(
             args.output, exp, algorithms, node_counts,
-            noise_levels if exp == 'noise' else None
+            noise_levels if exp == 'noise' else None,
+            fast_mode=args.fast_mode
         )
         total_generated += count
 

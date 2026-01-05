@@ -19,7 +19,7 @@
       <identifier>adaptive-prasle1</identifier>
       <description>ADAPTIVE_PRASLE Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/adaptive-prasle-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) adaptive-prasle-node.cooja TARGET=cooja ALGORITHM=adaptive-prasle</commands>
+      <commands>$(MAKE) -j$(CPUS) adaptive-prasle-node.cooja TARGET=cooja ALGORITHM=adaptive-prasle FAST_MODE=1</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/build/cooja/adaptive-prasle-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>

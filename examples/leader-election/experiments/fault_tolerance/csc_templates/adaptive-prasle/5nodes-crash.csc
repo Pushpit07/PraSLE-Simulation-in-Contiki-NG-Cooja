@@ -179,10 +179,10 @@ while(true) {
   // Check for leader crash event
   if (msg.equals("crash_leader") &amp;&amp; !leaderCrashed) {
     var moteCount = sim.getMotesCount();
-    var leaderMote = sim.getMoteWithID(moteCount);  // Highest ID = leader
+    var leaderMote = sim.getMoteWithID(1);  // Lowest ID = leader for PraSLE
 
     if (leaderMote != null) {
-      java.lang.System.out.println("===== CRASHING LEADER NODE " + moteCount + " at " + time + "ms =====");
+      java.lang.System.out.println("===== CRASHING LEADER NODE 1 at " + time + "ms =====");
       sim.removeMote(leaderMote);
       leaderCrashed = true;
       java.lang.System.out.println("===== LEADER NODE REMOVED - RE-ELECTION SHOULD START =====");

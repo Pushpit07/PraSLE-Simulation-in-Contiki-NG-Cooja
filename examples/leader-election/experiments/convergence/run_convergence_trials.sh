@@ -177,13 +177,23 @@ run_trial() {
     fi
 
     # Extract convergence time from log
-    # Look for the minimum non-zero first_convergence_time_ms from any node's METRICS
     local convergence_time=""
+
+    # Method 1: Look for explicit ALL_CONVERGED message (format: ALL_CONVERGED,<time_ms>)
     if grep -q "ALL_CONVERGED" "$log_file"; then
         convergence_time=$(grep "ALL_CONVERGED" "$log_file" | head -1 | sed 's/.*ALL_CONVERGED,\([0-9]*\).*/\1/')
-    elif grep -q "METRICS," "$log_file"; then
-        # Extract field 5 (first_convergence_time_ms), filter non-zero, get minimum
-        convergence_time=$(grep "METRICS," "$log_file" | cut -d',' -f5 | grep -v "^0$" | sort -n | head -1)
+    else
+        # Method 2: Extract timestamp from convergence log messages
+        # This works for algorithms that log "CONVERGED", "New coordinator", etc.
+        # Note: Cooja log timestamps are in MICROSECONDS, convert to milliseconds
+        local timestamp_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | \
+            grep -v "^METRICS" | head -1 | grep -oE '^[0-9]+' | head -1)
+        if [ -n "$timestamp_us" ]; then
+            convergence_time=$((timestamp_us / 1000))
+        elif grep -q "METRICS," "$log_file"; then
+            # Method 3: Last resort - extract from METRICS field 5 (first_convergence_time_ms)
+            convergence_time=$(grep "METRICS," "$log_file" | cut -d',' -f5 | grep -v "^0$" | sort -n | head -1)
+        fi
     fi
 
     # Write result

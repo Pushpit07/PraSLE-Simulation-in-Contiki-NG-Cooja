@@ -11,12 +11,13 @@
 /*
  * Bully algorithm (CURRENT_ALGORITHM == 1): Uses IPv6 with RPL routing
  * Ring algorithm (CURRENT_ALGORITHM == 2): Uses IPv6 with RPL routing
- * PraSLE, PraSLE-Custom (3, 4): Use NullNet (no IPv6)
+ * PraSLE (CURRENT_ALGORITHM == 3): Uses IPv6 with RPL routing (paper specifies UDP/IP)
+ * PraSLE-Custom (CURRENT_ALGORITHM == 4): Uses NullNet (no IPv6)
  */
-#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2  /* Bully and Ring use IPv6 */
+#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2 || CURRENT_ALGORITHM == 3  /* Bully, Ring, and PraSLE use IPv6 */
 #define NETSTACK_CONF_WITH_IPV6 1
 #define UIP_CONF_ROUTER 1
-#else /* PraSLE, PraSLE-Custom use nullnet - no IPv6 */
+#else /* PraSLE-Custom uses nullnet - no IPv6 */
 #define NETSTACK_CONF_WITH_IPV6 0
 #endif
 
@@ -35,7 +36,7 @@
 /* Network Configuration - Algorithm-Specific */
 /*---------------------------------------------------------------------------*/
 
-#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2  /* Bully and Ring use IPv6 */
+#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2 || CURRENT_ALGORITHM == 3  /* Bully, Ring, and PraSLE use IPv6 */
 
 /* UDP Configuration */
 #define UIP_CONF_UDP                               1
@@ -54,7 +55,7 @@
 #define RPL_CONF_DIO_INTERVAL_DOUBLINGS            8
 #define RPL_CONF_DIO_REDUNDANCY                    10
 
-#else /* PraSLE, PraSLE-Custom use nullnet */
+#else /* PraSLE-Custom uses nullnet */
 
 /* No UIP for nullnet-based algorithms */
 #define UIP_CONF_UDP                               0
@@ -93,17 +94,6 @@
 #define RING_SIZE                                  10
 #endif
 
-/* PraSLE Algorithm Configuration */
-#ifndef PRASLE_K_ROUNDS
-#define PRASLE_K_ROUNDS                            10
-#endif
-
-#ifndef PRASLE_T_SECONDS
-#define PRASLE_T_SECONDS                           1.0
-#endif
-
-#ifndef PRASLE_NETWORK_SIZE
-#define PRASLE_NETWORK_SIZE                        10
-#endif
+/* PraSLE parameters are defined in prasle-config.h */
 
 #endif /* PROJECT_CONF_H_ */

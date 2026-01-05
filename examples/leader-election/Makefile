@@ -58,8 +58,8 @@ else ifeq ($(ALGORITHM),ring)
   MAKE_ROUTING = MAKE_ROUTING_RPL_LITE
 else ifeq ($(ALGORITHM),prasle)
   ALGORITHM_ID = 3
-  MAKE_NET = MAKE_NET_NULLNET
-  MAKE_ROUTING = MAKE_ROUTING_NULLROUTING
+  MAKE_NET = MAKE_NET_IPV6
+  MAKE_ROUTING = MAKE_ROUTING_RPL_LITE
 else ifeq ($(ALGORITHM),adaptive-prasle)
   ALGORITHM_ID = 4
   MAKE_NET = MAKE_NET_NULLNET
@@ -85,9 +85,18 @@ MAX_NODES ?= 100
 CFLAGS += -DMAX_NODES=$(MAX_NODES)
 
 # Fast timing mode (reduced timeouts for testing/simulation)
+# Enables algorithm-specific fast mode flags for fair comparison
 FAST_MODE ?= 0
 ifeq ($(FAST_MODE),1)
-  CFLAGS += -DBULLY_FAST_MODE=1
+  ifeq ($(ALGORITHM),bully)
+    CFLAGS += -DBULLY_FAST_MODE=1
+  else ifeq ($(ALGORITHM),ring)
+    CFLAGS += -DRING_FAST_MODE=1
+  else ifeq ($(ALGORITHM),prasle)
+    CFLAGS += -DPRASLE_FAST_MODE=1
+  else ifeq ($(ALGORITHM),adaptive-prasle)
+    CFLAGS += -DPRASLE_FAST_MODE=1
+  endif
 endif
 
 # Ring size (number of nodes in ring topology, ring algorithm only)

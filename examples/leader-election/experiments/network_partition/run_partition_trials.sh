@@ -240,11 +240,16 @@ run_trial() {
         # Parse metrics from log file - look for convergence and leader info per partition
         # This is algorithm-agnostic and relies on log output patterns
         # Note: Cooja log timestamps are in MICROSECONDS, we convert to milliseconds
+        #
+        # Supported patterns:
+        # - Bully: "becoming coordinator", "New coordinator"
+        # - PraSLE: "CONVERGED: Leader"
+        # - Ring: "Final Leader"
 
         # For each partition, find the first convergence message
         # Log format: <timestamp> <node_id> [INFO: ...] <message>
         # Node ID is field 2 ($2), timestamp is field 1 ($1) in microseconds
-        local partition_a_us=$(grep -E "becoming coordinator|New coordinator" "$log_file" 2>/dev/null | \
+        local partition_a_us=$(grep -E "becoming coordinator|New coordinator|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_A_MIN" -v max="$PARTITION_A_MAX" '
                 { node_id = $2+0; if (node_id >= min && node_id <= max) { print $1; exit } }
@@ -255,7 +260,7 @@ run_trial() {
             partition_a_convergence="NA"
         fi
 
-        local partition_b_us=$(grep -E "becoming coordinator|New coordinator" "$log_file" 2>/dev/null | \
+        local partition_b_us=$(grep -E "becoming coordinator|New coordinator|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_B_MIN" -v max="$PARTITION_B_MAX" '
                 { node_id = $2+0; if (node_id >= min && node_id <= max) { print $1; exit } }
@@ -267,13 +272,13 @@ run_trial() {
         fi
 
         # Extract leader for each partition - default to expected highest node if not found
-        # Look for "becoming coordinator" (self-declaration) and "New coordinator: node X" (acceptance)
         # Use LAST occurrence to get the final elected leader, not the first
         #
-        # Log format: "timestamp nodeID [INFO: Bully] message"
-        # - "becoming coordinator" -> node ID is in field 2 (log prefix)
-        # - "New coordinator: node X" -> node ID is at the end of message
-        partition_a_leader=$(grep -E "becoming coordinator|New coordinator:" "$log_file" 2>/dev/null | \
+        # Supported patterns:
+        # - Bully: "becoming coordinator" (node ID in field 2), "New coordinator: node X"
+        # - PraSLE: "CONVERGED: Leader = X" (leader ID after "= ")
+        # - Ring: "Final Leader: X"
+        partition_a_leader=$(grep -E "becoming coordinator|New coordinator:|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_A_MIN" -v max="$PARTITION_A_MAX" '
                 /becoming coordinator/ {
@@ -281,10 +286,26 @@ run_trial() {
                     if (node_id >= min && node_id <= max) last_leader = node_id
                 }
                 /New coordinator: node/ {
-                    # Extract node ID from end of line (after "node ")
                     n = split($0, parts, "node ")
                     if (n >= 2) {
                         node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /CONVERGED: Leader = / {
+                    # PraSLE format: "CONVERGED: Leader = X (min=Y)"
+                    n = split($0, parts, "= ")
+                    if (n >= 2) {
+                        # Extract just the number before space or paren
+                        gsub(/[^0-9].*/, "", parts[2])
+                        node_id = parts[2]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /Final Leader:/ {
+                    n = split($0, parts, "Leader: ")
+                    if (n >= 2) {
+                        node_id = parts[2]+0
                         if (node_id >= min && node_id <= max) last_leader = node_id
                     }
                 }
@@ -292,7 +313,7 @@ run_trial() {
             ')
         [ -z "$partition_a_leader" ] && partition_a_leader="$PARTITION_A_MAX"
 
-        partition_b_leader=$(grep -E "becoming coordinator|New coordinator:" "$log_file" 2>/dev/null | \
+        partition_b_leader=$(grep -E "becoming coordinator|New coordinator:|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_B_MIN" -v max="$PARTITION_B_MAX" '
                 /becoming coordinator/ {
@@ -300,10 +321,25 @@ run_trial() {
                     if (node_id >= min && node_id <= max) last_leader = node_id
                 }
                 /New coordinator: node/ {
-                    # Extract node ID from end of line (after "node ")
                     n = split($0, parts, "node ")
                     if (n >= 2) {
                         node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /CONVERGED: Leader = / {
+                    # PraSLE format: "CONVERGED: Leader = X (min=Y)"
+                    n = split($0, parts, "= ")
+                    if (n >= 2) {
+                        gsub(/[^0-9].*/, "", parts[2])
+                        node_id = parts[2]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /Final Leader:/ {
+                    n = split($0, parts, "Leader: ")
+                    if (n >= 2) {
+                        node_id = parts[2]+0
                         if (node_id >= min && node_id <= max) last_leader = node_id
                     }
                 }
