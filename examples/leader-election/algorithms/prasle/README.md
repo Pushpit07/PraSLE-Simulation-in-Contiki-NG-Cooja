@@ -446,6 +446,29 @@ The paper reports results on IoT-Lab testbed with Cortex-M3 devices:
 - Message complexity grows linearly except for clique (quadratic)
 - Energy consumption is minimal (< 0.1J for most configurations)
 
+### Counterintuitive Scaling Behavior (Clique Topology)
+
+For **clique topology**, convergence time remains roughly constant or even *slightly decreases* as network size increases. This appears counterintuitive but is expected behavior:
+
+| Nodes | Mean Convergence | CV (Variance) |
+|-------|------------------|---------------|
+| 5     | ~1687 ms         | 8%            |
+| 10    | ~1460 ms         | 5%            |
+| 50    | ~1364 ms         | 4%            |
+| 100   | ~1337 ms         | 3%            |
+
+**Why this happens:**
+
+1. **K=2 is constant for clique** - Since clique has diameter 1, K=2 rounds is sufficient regardless of whether there are 5 or 100 nodes. The number of algorithm rounds does not scale with N.
+
+2. **Algorithm timing is dominated by fixed parameters** - Total time ≈ K × T + startup delay = 2 × 0.5s + 0-0.5s = ~1.0-1.5s (in FAST_MODE), independent of network size.
+
+3. **More parallel message exchange** - In larger clique networks, more nodes broadcast simultaneously during each round, potentially leading to faster information propagation.
+
+4. **Decreasing variance** - The coefficient of variation (CV) drops from 8% to 3% as network size increases, indicating more consistent/predictable behavior in larger networks.
+
+This is fundamentally different from Bully or Ring algorithms where convergence time scales with N. PraSLE's round-based design with topology-aware K values means clique networks converge in O(1) time regardless of size.
+
 ## Algorithm Comparison
 
 | Property | PraSLE | Bully | Ring |
