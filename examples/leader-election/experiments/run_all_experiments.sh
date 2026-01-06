@@ -11,7 +11,7 @@
 #   --algorithm, -a   Algorithm to test (bully, ring, prasle, adaptive-prasle, all)
 #   --trials, -t      Number of trials per configuration (default: 10)
 #   --nodes, -n       Comma-separated node counts (default: 5,10,50,100)
-#   --experiments, -e Comma-separated experiments (default: convergence)
+#   --experiments, -e Comma-separated experiments (default: all)
 #   --parallel, -p    Number of parallel jobs (default: auto)
 #   --dry-run         Preview commands without executing
 #   --help, -h        Show this help message
@@ -32,12 +32,14 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ALGORITHM="all"
 NUM_TRIALS=10
 NODE_COUNTS="5,10,50,100"
-EXPERIMENTS="convergence"
+EXPERIMENTS="convergence,fault_tolerance,noise,network_partition"
 PARALLEL_JOBS=""
 DRY_RUN=false
+TOPOLOGY="clique"  # Network topology for PraSLE (clique, ring, line, mesh)
 
 # Valid algorithms
 VALID_ALGORITHMS=("bully" "ring" "prasle" "adaptive-prasle")
+VALID_TOPOLOGIES=("clique" "ring" "line" "mesh")
 
 # Colors for output
 RED='\033[0;31m'
@@ -78,7 +80,8 @@ show_help() {
     echo "  --algorithm, -a   Algorithm to test (bully, ring, prasle, adaptive-prasle, all)"
     echo "  --trials, -t      Number of trials per configuration (default: 10)"
     echo "  --nodes, -n       Comma-separated node counts (default: 5,10,50,100)"
-    echo "  --experiments, -e Comma-separated experiments (default: convergence)"
+    echo "  --experiments, -e Comma-separated experiments (default: all)"
+    echo "  --topology        Network topology for PraSLE (clique, ring, line, mesh)"
     echo "  --parallel, -p    Number of parallel jobs (default: auto-detect)"
     echo "  --dry-run         Preview commands without executing"
     echo "  --help, -h        Show this help message"
@@ -90,6 +93,12 @@ show_help() {
     echo "  adaptive-prasle - Customized PraSLE algorithm"
     echo "  all          - Run all algorithms"
     echo ""
+    echo "Topologies (PraSLE only):"
+    echo "  clique       - Fully connected (default, K=2)"
+    echo "  ring         - Circular ring (K=(N+1)/2)"
+    echo "  line         - Linear chain (K=N)"
+    echo "  mesh         - 2D grid (K≈2√N)"
+    echo ""
     echo "Experiments:"
     echo "  convergence       - Measure convergence time"
     echo "  fault_tolerance   - Test leader crash recovery"
@@ -99,6 +108,7 @@ show_help() {
     echo "Examples:"
     echo "  $0 -a bully -t 50 -n 5,10"
     echo "  $0 -a all -e convergence -t 10"
+    echo "  $0 -a prasle --topology ring -n 10,50 -e convergence"
 }
 
 # Auto-detect number of CPU cores
@@ -139,6 +149,10 @@ while [[ $# -gt 0 ]]; do
             PARALLEL_JOBS="$2"
             shift 2
             ;;
+        --topology)
+            TOPOLOGY="$2"
+            shift 2
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -171,6 +185,18 @@ else
     ALGORITHMS=("$ALGORITHM")
 fi
 
+# Validate topology
+if [[ ! " ${VALID_TOPOLOGIES[@]} " =~ " ${TOPOLOGY} " ]]; then
+    print_error "Invalid topology: $TOPOLOGY"
+    print_error "Valid topologies: ${VALID_TOPOLOGIES[*]}"
+    exit 1
+fi
+
+# Warn if topology is set but algorithm is not prasle
+if [[ "$TOPOLOGY" != "clique" && ! " prasle adaptive-prasle " =~ " ${ALGORITHM} " && "$ALGORITHM" != "all" ]]; then
+    print_warn "Topology '$TOPOLOGY' only applies to prasle/adaptive-prasle algorithms"
+fi
+
 # Parse node counts
 IFS=',' read -ra NODES_ARRAY <<< "$NODE_COUNTS"
 
@@ -188,6 +214,7 @@ print_header "Leader Election Experiment Configuration"
 echo "Algorithms:     ${ALGORITHMS[*]}"
 echo "Node counts:    ${NODES_ARRAY[*]}"
 echo "Experiments:    ${EXPERIMENTS_ARRAY[*]}"
+echo "Topology:       $TOPOLOGY"
 echo "Trials:         $NUM_TRIALS"
 echo "Parallel jobs:  $PARALLEL_JOBS"
 echo "Dry run:        $DRY_RUN"
@@ -224,21 +251,33 @@ check_and_generate_csc() {
     local nodes=$3
     local csc_filename=$4
 
-    local CSC_DIR="$SCRIPT_DIR/$exp_type/csc_templates/$algo"
+    # Use topology-specific directory for PraSLE with non-clique topology
+    local algo_dir="$algo"
+    if [[ "$TOPOLOGY" != "clique" && ("$algo" == "prasle" || "$algo" == "adaptive-prasle") ]]; then
+        algo_dir="${algo}-${TOPOLOGY}"
+    fi
+
+    local CSC_DIR="$SCRIPT_DIR/$exp_type/csc_templates/$algo_dir"
     local CSC_FILE="$CSC_DIR/$csc_filename"
 
     if [[ ! -f "$CSC_FILE" ]]; then
         print_warn "Missing CSC template: $CSC_FILE"
-        print_info "Generating CSC templates for $algo ($exp_type)..."
+        print_info "Generating CSC templates for $algo ($exp_type, $TOPOLOGY topology)..."
 
         if [[ "$DRY_RUN" != "true" ]]; then
+            local topo_flag=""
+            if [[ "$TOPOLOGY" != "clique" && ("$algo" == "prasle" || "$algo" == "adaptive-prasle") ]]; then
+                topo_flag="--topology $TOPOLOGY"
+            fi
             python3 "$PROJECT_DIR/scripts/generate_csc.py" \
                 --algorithm "$algo" \
                 --nodes "$nodes" \
                 --experiment "$exp_type" \
+                $topo_flag \
+                --fast-mode \
                 --output "$SCRIPT_DIR/$exp_type/csc_templates/"
         else
-            echo "  [DRY RUN] python3 generate_csc.py --algorithm $algo --nodes $nodes --experiment $exp_type"
+            echo "  [DRY RUN] python3 generate_csc.py --algorithm $algo --nodes $nodes --experiment $exp_type --topology $TOPOLOGY"
         fi
     else
         print_info "Found: $CSC_FILE"
@@ -276,8 +315,8 @@ print_header "Running Experiments"
 
 START_TIME=$(date +%s)
 
-# Get experiment duration based on algorithm and node count
-# Ring algorithm needs longer duration for large networks due to O(n) message complexity
+# Get experiment duration based on algorithm, node count, and topology
+# Ring algorithm and PraSLE with non-clique topologies need longer duration
 get_experiment_duration() {
     local algo=$1
     local nodes=$2
@@ -289,19 +328,70 @@ get_experiment_duration() {
             100) echo 180 ;;  # 3 minutes for 100 nodes
             *)   echo 60 ;;   # 1 minute for smaller rings
         esac
+    elif [[ ("$algo" == "prasle" || "$algo" == "adaptive-prasle") && "$TOPOLOGY" != "clique" ]]; then
+        # PraSLE with non-clique topologies need longer duration
+        # K scales with network size: ring K=(N+1)/2, line K=N, mesh K≈2√N
+        case $TOPOLOGY in
+            ring)
+                case $nodes in
+                    50)  echo 120 ;;  # K=26 rounds
+                    100) echo 180 ;;  # K=51 rounds
+                    *)   echo 60 ;;
+                esac
+                ;;
+            line)
+                case $nodes in
+                    50)  echo 180 ;;  # K=50 rounds
+                    100) echo 300 ;;  # K=100 rounds
+                    *)   echo 60 ;;
+                esac
+                ;;
+            mesh)
+                case $nodes in
+                    50)  echo 90 ;;   # K≈14 rounds
+                    100) echo 120 ;;  # K≈20 rounds
+                    *)   echo 60 ;;
+                esac
+                ;;
+            *)
+                echo 60 ;;
+        esac
     else
-        echo 60  # Default 1 minute for other algorithms
+        echo 60  # Default 1 minute for clique topology
+    fi
+}
+
+# Get the CSC template directory name for an algorithm
+# For PraSLE with non-clique topology, returns "prasle-{topology}"
+get_csc_algo_dir() {
+    local algo=$1
+    if [[ "$TOPOLOGY" != "clique" && ("$algo" == "prasle" || "$algo" == "adaptive-prasle") ]]; then
+        echo "${algo}-${TOPOLOGY}"
+    else
+        echo "$algo"
     fi
 }
 
 for algo in "${ALGORITHMS[@]}"; do
     for exp in "${EXPERIMENTS_ARRAY[@]}"; do
         for nodes in "${NODES_ARRAY[@]}"; do
+            # Get the CSC directory name (topology-aware for PraSLE)
+            csc_algo_dir=$(get_csc_algo_dir "$algo")
+
             echo ""
-            print_info "Running $exp experiment for $algo with $nodes nodes"
+            if [[ "$csc_algo_dir" != "$algo" ]]; then
+                print_info "Running $exp experiment for $algo ($TOPOLOGY topology) with $nodes nodes"
+            else
+                print_info "Running $exp experiment for $algo with $nodes nodes"
+            fi
 
             # Ring algorithm needs clean build for each RING_SIZE
             if [[ "$algo" == "ring" && "$DRY_RUN" != "true" ]]; then
+                rm -rf "$PROJECT_DIR/build" 2>/dev/null || true
+            fi
+
+            # PraSLE with non-clique topology needs clean build
+            if [[ "$csc_algo_dir" != "$algo" && "$DRY_RUN" != "true" ]]; then
                 rm -rf "$PROJECT_DIR/build" 2>/dev/null || true
             fi
 
@@ -313,7 +403,7 @@ for algo in "${ALGORITHMS[@]}"; do
                     convergence)
                         if [[ -x "$SCRIPT_DIR/convergence/run_convergence_trials.sh" ]]; then
                             "$SCRIPT_DIR/convergence/run_convergence_trials.sh" \
-                                "$algo" "$nodes" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
+                                "$csc_algo_dir" "$nodes" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
                         else
                             print_warn "Convergence trial script not found, skipping..."
                         fi
@@ -321,7 +411,7 @@ for algo in "${ALGORITHMS[@]}"; do
                     fault_tolerance)
                         if [[ -x "$SCRIPT_DIR/fault_tolerance/run_crash_trials.sh" ]]; then
                             "$SCRIPT_DIR/fault_tolerance/run_crash_trials.sh" \
-                                "$algo" "$nodes" "$NUM_TRIALS" 60 120 "$PARALLEL_JOBS"
+                                "$csc_algo_dir" "$nodes" "$NUM_TRIALS" 60 120 "$PARALLEL_JOBS"
                         else
                             print_warn "Fault tolerance trial script not found, skipping..."
                         fi
@@ -332,7 +422,7 @@ for algo in "${ALGORITHMS[@]}"; do
                             for noise_level in 50 70 90; do
                                 print_info "Running noise experiment with ${noise_level}% success rate"
                                 "$SCRIPT_DIR/noise/run_noise_trials.sh" \
-                                    "$algo" "$nodes" "$noise_level" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
+                                    "$csc_algo_dir" "$nodes" "$noise_level" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
                             done
                         else
                             print_warn "Noise trial script not found, skipping..."
@@ -341,7 +431,7 @@ for algo in "${ALGORITHMS[@]}"; do
                     network_partition)
                         if [[ -x "$SCRIPT_DIR/network_partition/run_partition_trials.sh" ]]; then
                             "$SCRIPT_DIR/network_partition/run_partition_trials.sh" \
-                                "$algo" "$nodes" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
+                                "$csc_algo_dir" "$nodes" "$NUM_TRIALS" "$DURATION" "$PARALLEL_JOBS"
                         else
                             print_warn "Network partition trial script not found, skipping..."
                         fi
@@ -351,7 +441,7 @@ for algo in "${ALGORITHMS[@]}"; do
                         ;;
                 esac
             else
-                echo "  [DRY RUN] Would run $exp for $algo with $nodes nodes"
+                echo "  [DRY RUN] Would run $exp for $algo ($TOPOLOGY topology) with $nodes nodes"
             fi
         done
     done

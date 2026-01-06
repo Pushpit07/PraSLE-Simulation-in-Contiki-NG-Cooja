@@ -32,16 +32,21 @@ NUM_TRIALS=${3:-100}
 DURATION=${4:-60}
 PARALLEL_JOBS=${5:-""}
 
-# Validate algorithm
-case "$ALGORITHM" in
-    bully|ring|prasle|adaptive-prasle)
-        ;;
-    *)
-        echo "Error: Invalid algorithm '$ALGORITHM'"
-        echo "Valid algorithms: bully, ring, prasle, adaptive-prasle"
-        exit 1
-        ;;
-esac
+# Extract base algorithm and topology from ALGORITHM parameter
+# e.g., "prasle-ring" -> BASE_ALGO="prasle", TOPOLOGY="ring"
+# e.g., "bully" -> BASE_ALGO="bully", TOPOLOGY=""
+if [[ "$ALGORITHM" =~ ^(prasle|adaptive-prasle)-(ring|line|mesh)$ ]]; then
+    BASE_ALGO="${BASH_REMATCH[1]}"
+    TOPOLOGY="${BASH_REMATCH[2]}"
+elif [[ "$ALGORITHM" =~ ^(bully|ring|prasle|adaptive-prasle)$ ]]; then
+    BASE_ALGO="$ALGORITHM"
+    TOPOLOGY=""
+else
+    echo "Error: Invalid algorithm '$ALGORITHM'"
+    echo "Valid algorithms: bully, ring, prasle, adaptive-prasle"
+    echo "Topology variants: prasle-ring, prasle-line, prasle-mesh, adaptive-prasle-ring, etc."
+    exit 1
+fi
 
 # Validate node count
 case "$NODE_COUNT" in
@@ -84,6 +89,10 @@ echo -e "${BLUE}============================================================${NC
 echo -e "${BLUE}Convergence Time Trials${NC}"
 echo -e "${BLUE}============================================================${NC}"
 echo "Algorithm:      $ALGORITHM"
+if [[ -n "$TOPOLOGY" ]]; then
+    echo "Base algorithm: $BASE_ALGO"
+    echo "Topology:       $TOPOLOGY"
+fi
 echo "Node count:     $NODE_COUNT"
 echo "Trials:         $NUM_TRIALS"
 echo "Duration:       ${DURATION}s"
@@ -96,10 +105,20 @@ echo ""
 if [[ ! -f "$CSC_TEMPLATE" ]]; then
     echo -e "${YELLOW}[WARN]${NC} CSC template not found: $CSC_TEMPLATE"
     echo "Generating CSC template..."
-    python3 "$PROJECT_DIR/scripts/generate_csc.py" \
-        --algorithm "$ALGORITHM" \
-        --nodes "$NODE_COUNT" \
-        --output "$SCRIPT_DIR/csc_templates/"
+    if [[ -n "$TOPOLOGY" ]]; then
+        python3 "$PROJECT_DIR/scripts/generate_csc.py" \
+            --algorithm "$BASE_ALGO" \
+            --nodes "$NODE_COUNT" \
+            --topology "$TOPOLOGY" \
+            --fast-mode \
+            --output "$SCRIPT_DIR/csc_templates/"
+    else
+        python3 "$PROJECT_DIR/scripts/generate_csc.py" \
+            --algorithm "$BASE_ALGO" \
+            --nodes "$NODE_COUNT" \
+            --fast-mode \
+            --output "$SCRIPT_DIR/csc_templates/"
+    fi
 fi
 
 # Create output directory
@@ -210,7 +229,7 @@ run_trial() {
 
 # Export for parallel execution
 export -f run_trial
-export ALGORITHM NODE_COUNT CSC_TEMPLATE OUTPUT_DIR RESULTS_FILE COOJA_JAR PROJECT_DIR DURATION TIMEOUT_CMD
+export ALGORITHM BASE_ALGO TOPOLOGY NODE_COUNT CSC_TEMPLATE OUTPUT_DIR RESULTS_FILE COOJA_JAR PROJECT_DIR DURATION TIMEOUT_CMD
 
 # Run trials in parallel
 START_TIME=$(date +%s)

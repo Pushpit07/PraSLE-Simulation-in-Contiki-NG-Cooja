@@ -80,10 +80,19 @@ NUM_TRIALS=${ARGS[3]:-100}
 DURATION=${ARGS[4]:-60}
 PARALLEL_JOBS=${ARGS[5]:-0}  # 0 means auto-detect
 
-# Validate algorithm
-if [[ ! "$ALGORITHM" =~ ^(bully|ring|prasle|adaptive-prasle)$ ]]; then
+# Validate algorithm - supports base algorithms and topology variants
+# e.g., "prasle-ring" -> BASE_ALGO="prasle", TOPOLOGY="ring"
+# e.g., "bully" -> BASE_ALGO="bully", TOPOLOGY=""
+if [[ "$ALGORITHM" =~ ^(prasle|adaptive-prasle)-(ring|line|mesh)$ ]]; then
+    BASE_ALGO="${BASH_REMATCH[1]}"
+    TOPOLOGY="${BASH_REMATCH[2]}"
+elif [[ "$ALGORITHM" =~ ^(bully|ring|prasle|adaptive-prasle)$ ]]; then
+    BASE_ALGO="$ALGORITHM"
+    TOPOLOGY=""
+else
     echo "Error: Invalid algorithm '$ALGORITHM'"
     echo "Algorithm must be one of: bully, ring, prasle, adaptive-prasle"
+    echo "Topology variants: prasle-ring, prasle-line, prasle-mesh, adaptive-prasle-ring, etc."
     exit 1
 fi
 
@@ -134,6 +143,10 @@ echo "=============================================================="
 echo " Leader Election Algorithm Network Noise Resilience Trials"
 echo "=============================================================="
 echo "Algorithm:         $ALGORITHM"
+if [[ -n "$TOPOLOGY" ]]; then
+    echo "Base algorithm:    $BASE_ALGO"
+    echo "Topology:          $TOPOLOGY"
+fi
 echo "Node count:        $NODE_COUNT nodes"
 echo "Noise level:       ${NOISE_LEVEL}% success rate"
 echo "Simulation file:   $SIMULATION_FILE"
@@ -244,7 +257,7 @@ run_trial() {
 
 # Export function and variables for parallel execution
 export -f run_trial
-export OUTPUT_BASE SIMULATION_FILE SCRIPTS_DIR DURATION NODE_COUNT NOISE_LEVEL USE_RANDOM_SEED ALGORITHM COOJA_JAR CONTIKI_DIR
+export OUTPUT_BASE SIMULATION_FILE SCRIPTS_DIR DURATION NODE_COUNT NOISE_LEVEL USE_RANDOM_SEED ALGORITHM BASE_ALGO TOPOLOGY COOJA_JAR CONTIKI_DIR
 
 # Run trials in parallel
 echo "Running $NUM_TRIALS trials with $PARALLEL_JOBS parallel jobs..."

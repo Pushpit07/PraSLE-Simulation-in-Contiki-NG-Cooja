@@ -104,6 +104,25 @@ ifdef RING_SIZE
   CFLAGS += -DRING_SIZE=$(RING_SIZE)
 endif
 
+# Network topology for PraSLE (clique, ring, line, mesh)
+# Usage: make ALGORITHM=prasle TOPOLOGY=ring NETWORK_SIZE=10
+ifdef TOPOLOGY
+  ifeq ($(TOPOLOGY),clique)
+    CFLAGS += -DNETWORK_TOPOLOGY=4
+  else ifeq ($(TOPOLOGY),ring)
+    CFLAGS += -DNETWORK_TOPOLOGY=1
+  else ifeq ($(TOPOLOGY),line)
+    CFLAGS += -DNETWORK_TOPOLOGY=2
+  else ifeq ($(TOPOLOGY),mesh)
+    CFLAGS += -DNETWORK_TOPOLOGY=3
+  endif
+endif
+
+# Network size for PraSLE (used to calculate K for non-clique topologies)
+ifdef NETWORK_SIZE
+  CFLAGS += -DPRASLE_NETWORK_SIZE=$(NETWORK_SIZE)
+endif
+
 # Include paths
 CFLAGS += -I$(CURDIR)/common
 CFLAGS += -I$(CURDIR)/algorithms/$(ALGORITHM)
@@ -190,6 +209,17 @@ help:
 	@echo "  ENABLE_METRICS=1        # Enable metrics (0 or 1)"
 	@echo "  MAX_NODES=100           # Maximum number of nodes"
 	@echo "  FAST_MODE=1             # Fast timing mode (reduced timeouts)"
+	@echo ""
+	@echo "PraSLE Topology Options:"
+	@echo "  TOPOLOGY=clique         # Fully connected (default, K=2)"
+	@echo "  TOPOLOGY=ring           # Circular ring (K=(N+1)/2)"
+	@echo "  TOPOLOGY=line           # Linear chain (K=N)"
+	@echo "  TOPOLOGY=mesh           # 2D grid (K≈2√N)"
+	@echo "  NETWORK_SIZE=10         # Network size for K calculation"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make ALGORITHM=prasle TOPOLOGY=ring NETWORK_SIZE=50"
+	@echo "  make ALGORITHM=prasle TOPOLOGY=mesh NETWORK_SIZE=100 FAST_MODE=1"
 	@echo ""
 	@echo "Current configuration:"
 	@echo "  ALGORITHM=$(ALGORITHM)"

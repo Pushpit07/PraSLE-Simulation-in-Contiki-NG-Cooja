@@ -26,6 +26,7 @@ import math
 ALGORITHMS = ['bully', 'ring', 'prasle', 'adaptive-prasle']
 NODE_COUNTS = [5, 10, 50, 100]
 NOISE_LEVELS = [50, 70, 90]  # Success rates in percent
+TOPOLOGIES = ['clique', 'ring', 'line', 'mesh']  # For PraSLE algorithm
 
 # Partition configurations: {node_count: (a_range, b_range)}
 PARTITION_CONFIG = {
@@ -57,7 +58,7 @@ CSC_TEMPLATE = '''<?xml version="1.0" encoding="UTF-8"?>
       <identifier>{algorithm}1</identifier>
       <description>{algorithm_upper} Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/{algorithm}-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) {algorithm}-node.cooja TARGET=cooja ALGORITHM={algorithm}{fast_mode_flag}</commands>
+      <commands>$(MAKE) -j$(CPUS) {algorithm}-node.cooja TARGET=cooja ALGORITHM={algorithm}{topology_flag}{network_size_flag}{fast_mode_flag}</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/build/cooja/{algorithm}-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>
@@ -253,14 +254,50 @@ def generate_positions_grid(node_count, spacing=30.0):
 
 
 def generate_positions_ring(node_count):
-    """Generate circular positions for ring algorithm."""
+    """Generate circular positions for ring topology.
+
+    Adjacent nodes in the ring should be within radio range of each other,
+    but non-adjacent nodes should NOT be in range (to enforce ring topology).
+    """
     positions = []
-    radius = 50 + node_count * 2
+    # Use larger radius for more nodes to maintain separation
+    radius = 50 + node_count * 3
 
     for i in range(node_count):
         angle = 2 * math.pi * i / node_count
         x = 100 + radius * math.cos(angle)
         y = 100 + radius * math.sin(angle)
+        positions.append((x, y))
+
+    return positions
+
+
+def generate_positions_line(node_count, spacing=40.0):
+    """Generate linear positions for line topology.
+
+    Nodes are placed in a horizontal line. Each node can only reach
+    its immediate neighbors (left and right).
+    """
+    positions = []
+    for i in range(node_count):
+        x = 20 + i * spacing
+        y = 100
+        positions.append((x, y))
+    return positions
+
+
+def generate_positions_mesh(node_count, spacing=50.0):
+    """Generate grid positions for mesh topology.
+
+    Nodes are placed in a 2D grid. Each node can reach its 4-connected
+    neighbors (up, down, left, right) but NOT diagonal neighbors.
+    """
+    positions = []
+    cols = int(math.ceil(math.sqrt(node_count)))
+
+    for i in range(node_count):
+        x = 20 + (i % cols) * spacing
+        y = 20 + (i // cols) * spacing
         positions.append((x, y))
 
     return positions
@@ -298,14 +335,22 @@ def generate_positions_partition(node_count):
     return positions
 
 
-def generate_positions(node_count, algorithm, experiment):
-    """Generate positions based on algorithm and experiment type."""
+def generate_positions(node_count, algorithm, experiment, topology='clique'):
+    """Generate positions based on algorithm, experiment type, and topology."""
     if experiment == 'network_partition':
         return generate_positions_partition(node_count)
     elif algorithm == 'ring':
         return generate_positions_ring(node_count)
-    else:
-        return generate_positions_grid(node_count)
+    elif algorithm in ['prasle', 'adaptive-prasle'] and topology != 'clique':
+        # Use topology-specific positioning for PraSLE
+        if topology == 'ring':
+            return generate_positions_ring(node_count)
+        elif topology == 'line':
+            return generate_positions_line(node_count)
+        elif topology == 'mesh':
+            return generate_positions_mesh(node_count)
+    # Default: grid layout for clique (full-mesh) connectivity
+    return generate_positions_grid(node_count)
 
 
 def generate_motes_xml(algorithm, node_count, positions):
@@ -324,22 +369,42 @@ def generate_motes_xml(algorithm, node_count, positions):
     return '\n'.join(motes)
 
 
-def get_tx_range(algorithm, node_count, experiment):
+def get_tx_range(algorithm, node_count, experiment, topology='clique'):
     """Calculate appropriate transmission range.
 
-    For grid layouts (Bully, PraSLE, Adaptive-PraSLE):
+    For clique topology (Bully, PraSLE with clique):
         Radio range must cover the entire grid diagonal for full-mesh connectivity.
         This ensures all nodes can hear each other for correct leader election.
 
-    For ring layouts:
+    For ring topology:
         Radio range only needs to reach adjacent nodes in the ring.
+        Must NOT reach nodes 2 hops away to enforce ring topology.
+
+    For line topology:
+        Radio range only needs to reach immediate neighbors.
+        Must NOT reach nodes 2 hops away.
+
+    For mesh topology:
+        Radio range reaches 4-connected neighbors (up/down/left/right).
+        Must NOT reach diagonal neighbors.
     """
-    if algorithm == 'ring':
-        radius = 50 + node_count * 2
+    if algorithm == 'ring' or (algorithm in ['prasle', 'adaptive-prasle'] and topology == 'ring'):
+        # Ring: reach adjacent nodes only
+        radius = 50 + node_count * 3
         arc_length = 2 * math.pi * radius / node_count
-        return arc_length * 1.5
+        # Range should be > 1 arc length but < 2 arc lengths
+        return arc_length * 1.3
+    elif algorithm in ['prasle', 'adaptive-prasle'] and topology == 'line':
+        # Line: reach immediate neighbors only (spacing = 40)
+        spacing = 40.0
+        return spacing * 1.3  # Reach 1 hop but not 2 hops
+    elif algorithm in ['prasle', 'adaptive-prasle'] and topology == 'mesh':
+        # Mesh: reach 4-connected neighbors but not diagonals (spacing = 50)
+        spacing = 50.0
+        # diagonal = spacing * sqrt(2) ≈ 70.7, so range should be < 70
+        return spacing * 1.2  # ~60, reaches orthogonal but not diagonal
     else:
-        # Full-mesh connectivity: radio range must cover entire grid diagonal
+        # Clique/full-mesh connectivity: radio range must cover entire grid diagonal
         # This ensures all nodes can hear broadcast messages from any other node
         cols = int(math.ceil(math.sqrt(node_count)))
         rows = int(math.ceil(node_count / cols))
@@ -361,19 +426,20 @@ def get_success_ratio(experiment, noise_level=None):
     return 1.0, 1.0
 
 
-def get_title(algorithm, node_count, experiment, noise_level=None):
+def get_title(algorithm, node_count, experiment, noise_level=None, topology='clique'):
     """Generate appropriate title for the simulation."""
     algo_upper = algorithm.upper().replace('-', '_')
+    topo_str = f" ({topology.capitalize()} Topology)" if topology != 'clique' else ""
 
     if experiment == 'convergence':
-        return f"{algo_upper} Leader Election - {node_count} Nodes"
+        return f"{algo_upper} Leader Election - {node_count} Nodes{topo_str}"
     elif experiment == 'fault_tolerance':
-        return f"{algo_upper} Leader Election - {node_count} Nodes - Leader Crash Scenario"
+        return f"{algo_upper} Leader Election - {node_count} Nodes{topo_str} - Leader Crash Scenario"
     elif experiment == 'noise':
-        return f"{algo_upper} Leader Election - {node_count} Nodes - {noise_level}% Success Rate (Network Noise)"
+        return f"{algo_upper} Leader Election - {node_count} Nodes{topo_str} - {noise_level}% Success Rate (Network Noise)"
     elif experiment == 'network_partition':
-        return f"{algo_upper} Leader Election - {node_count} Nodes - Network Partition Scenario"
-    return f"{algo_upper} Leader Election - {node_count} Nodes"
+        return f"{algo_upper} Leader Election - {node_count} Nodes{topo_str} - Network Partition Scenario"
+    return f"{algo_upper} Leader Election - {node_count} Nodes{topo_str}"
 
 
 def get_script(algorithm, experiment):
@@ -400,20 +466,27 @@ def get_output_filename(node_count, experiment, noise_level=None):
 
 
 def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
-                 noise_level=None, fast_mode=False):
+                 noise_level=None, fast_mode=False, topology='clique'):
     """Generate a single CSC file."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    positions = generate_positions(node_count, algorithm, experiment)
+    positions = generate_positions(node_count, algorithm, experiment, topology)
     motes_xml = generate_motes_xml(algorithm, node_count, positions)
-    tx_range = get_tx_range(algorithm, node_count, experiment)
+    tx_range = get_tx_range(algorithm, node_count, experiment, topology)
     success_tx, success_rx = get_success_ratio(experiment, noise_level)
-    title = get_title(algorithm, node_count, experiment, noise_level)
+    title = get_title(algorithm, node_count, experiment, noise_level, topology)
     script = get_script(algorithm, experiment)
 
-    # Add FAST_MODE=1 flag if requested
+    # Add build flags
     fast_mode_flag = " FAST_MODE=1" if fast_mode else ""
+
+    # Add topology flag for PraSLE algorithms
+    topology_flag = ""
+    network_size_flag = ""
+    if algorithm in ['prasle', 'adaptive-prasle'] and topology != 'clique':
+        topology_flag = f" TOPOLOGY={topology}"
+        network_size_flag = f" NETWORK_SIZE={node_count}"
 
     content = CSC_TEMPLATE.format(
         title=title,
@@ -426,6 +499,8 @@ def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
         success_tx=success_tx,
         success_rx=success_rx,
         script=script,
+        topology_flag=topology_flag,
+        network_size_flag=network_size_flag,
         fast_mode_flag=fast_mode_flag
     )
 
@@ -437,7 +512,8 @@ def generate_csc(algorithm, node_count, output_dir, experiment='convergence',
 
 
 def generate_all_for_experiment(output_base, experiment, algorithms=None,
-                                 node_counts=None, noise_levels=None, fast_mode=False):
+                                 node_counts=None, noise_levels=None, fast_mode=False,
+                                 topology='clique'):
     """Generate all CSC files for a specific experiment type."""
     algorithms = algorithms or ALGORITHMS
     node_counts = node_counts or NODE_COUNTS
@@ -447,14 +523,18 @@ def generate_all_for_experiment(output_base, experiment, algorithms=None,
 
     for algo in algorithms:
         for nc in node_counts:
-            if experiment == 'noise':
-                for nl in noise_levels:
-                    output_dir = Path(output_base) / algo
-                    generate_csc(algo, nc, output_dir, experiment, nl, fast_mode)
-                    generated += 1
+            # Determine output subdirectory based on algorithm and topology
+            if algo in ['prasle', 'adaptive-prasle'] and topology != 'clique':
+                output_dir = Path(output_base) / f"{algo}-{topology}"
             else:
                 output_dir = Path(output_base) / algo
-                generate_csc(algo, nc, output_dir, experiment, fast_mode=fast_mode)
+
+            if experiment == 'noise':
+                for nl in noise_levels:
+                    generate_csc(algo, nc, output_dir, experiment, nl, fast_mode, topology)
+                    generated += 1
+            else:
+                generate_csc(algo, nc, output_dir, experiment, fast_mode=fast_mode, topology=topology)
                 generated += 1
 
     return generated
@@ -471,6 +551,11 @@ Examples:
   %(prog)s --experiment noise --noise-level 50 --output csc_templates/
   %(prog)s --experiment fault_tolerance --output csc_templates/
   %(prog)s --experiment network_partition --all --output csc_templates/
+
+Topology examples (PraSLE only):
+  %(prog)s --algorithm prasle --topology ring --output csc_templates/
+  %(prog)s --algorithm prasle --topology mesh --nodes 50 --output csc_templates/
+  %(prog)s --algorithm prasle --topology line --experiment convergence --output csc_templates/
         """
     )
     parser.add_argument('--algorithm', '-a', choices=ALGORITHMS + ['all'], default='all',
@@ -485,6 +570,8 @@ Examples:
                         help='Experiment type (default: convergence)')
     parser.add_argument('--noise-level', type=int, choices=NOISE_LEVELS,
                         help='Noise level for noise experiments (50, 70, 90)')
+    parser.add_argument('--topology', '-t', choices=TOPOLOGIES, default='clique',
+                        help='Network topology for PraSLE (default: clique)')
     parser.add_argument('--fast-mode', '-f', action='store_true',
                         help='Enable FAST_MODE in build commands for faster convergence')
     parser.add_argument('--all', action='store_true',
@@ -501,11 +588,13 @@ Examples:
 
     for exp in experiments:
         mode_str = " (FAST_MODE)" if args.fast_mode else ""
-        print(f"\n=== Generating {exp} CSC files{mode_str} ===")
+        topo_str = f" [{args.topology} topology]" if args.topology != 'clique' else ""
+        print(f"\n=== Generating {exp} CSC files{mode_str}{topo_str} ===")
         count = generate_all_for_experiment(
             args.output, exp, algorithms, node_counts,
             noise_levels if exp == 'noise' else None,
-            fast_mode=args.fast_mode
+            fast_mode=args.fast_mode,
+            topology=args.topology
         )
         total_generated += count
 

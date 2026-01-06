@@ -240,8 +240,46 @@ cd examples/leader-election/experiments
 | `--trials, -t` | Number of trials per configuration | 10 |
 | `--nodes, -n` | Comma-separated node counts | 5,10,50,100 |
 | `--experiments, -e` | Comma-separated experiment types | convergence |
+| `--topology` | Network topology for PraSLE (clique, ring, line, mesh) | clique |
 | `--parallel, -p` | Number of parallel jobs | auto-detect |
 | `--dry-run` | Preview commands without executing | - |
+
+### Running PraSLE with Different Topologies
+
+PraSLE supports multiple network topologies. Each topology has different convergence characteristics:
+
+| Topology | K Rounds | Convergence Time (100 nodes) | Description |
+|----------|----------|------------------------------|-------------|
+| `clique` | K=2 (constant) | ~1.3s | Fully connected - O(1) |
+| `ring` | K=(N+1)/2 | ~25s | Circular ring - O(N/2) |
+| `line` | K=N | ~50s | Linear chain - O(N) |
+| `mesh` | K≈2√N | ~10s | 2D grid - O(√N) |
+
+**Running experiments with different topologies:**
+
+```bash
+cd examples/leader-election/experiments
+
+# Run PraSLE with ring topology
+./run_all_experiments.sh --algorithm prasle --topology ring --experiments convergence
+
+# Run PraSLE with mesh topology, specific node counts
+./run_all_experiments.sh --algorithm prasle --topology mesh --nodes 10,50 --trials 50
+
+# Run PraSLE with line topology (longest convergence time)
+./run_all_experiments.sh --algorithm prasle --topology line --nodes 5,10 --experiments convergence
+```
+
+**Note:** Non-clique topologies will automatically:
+- Generate appropriate CSC templates with restricted radio ranges
+- Set K values proportional to network diameter
+- Adjust experiment durations accordingly
+
+Results for different topologies are saved in separate directories:
+- `results/prasle/` - clique topology (default)
+- `results/prasle-ring/` - ring topology
+- `results/prasle-mesh/` - mesh topology
+- `results/prasle-line/` - line topology
 
 ### Option 2: Individual Experiment Scripts
 

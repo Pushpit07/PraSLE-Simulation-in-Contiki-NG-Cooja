@@ -89,10 +89,19 @@ NUM_TRIALS=${ARGS[2]:-100}
 DURATION=${ARGS[3]:-60}
 PARALLEL_JOBS=${ARGS[4]:-0}  # 0 means auto-detect
 
-# Validate algorithm
-if [[ ! "$ALGORITHM" =~ ^(bully|ring|prasle|adaptive-prasle)$ ]]; then
+# Validate algorithm - supports base algorithms and topology variants
+# e.g., "prasle-ring" -> BASE_ALGO="prasle", TOPOLOGY="ring"
+# e.g., "bully" -> BASE_ALGO="bully", TOPOLOGY=""
+if [[ "$ALGORITHM" =~ ^(prasle|adaptive-prasle)-(ring|line|mesh)$ ]]; then
+    BASE_ALGO="${BASH_REMATCH[1]}"
+    TOPOLOGY="${BASH_REMATCH[2]}"
+elif [[ "$ALGORITHM" =~ ^(bully|ring|prasle|adaptive-prasle)$ ]]; then
+    BASE_ALGO="$ALGORITHM"
+    TOPOLOGY=""
+else
     echo "Error: Invalid algorithm '$ALGORITHM'"
     echo "Algorithm must be one of: bully, ring, prasle, adaptive-prasle"
+    echo "Topology variants: prasle-ring, prasle-line, prasle-mesh, adaptive-prasle-ring, etc."
     exit 1
 fi
 
@@ -164,6 +173,10 @@ echo "=============================================================="
 echo " Leader Election Algorithm Network Partition Trials"
 echo "=============================================================="
 echo "Algorithm:         $ALGORITHM"
+if [[ -n "$TOPOLOGY" ]]; then
+    echo "Base algorithm:    $BASE_ALGO"
+    echo "Topology:          $TOPOLOGY"
+fi
 echo "Node count:        $NODE_COUNT nodes"
 echo "Partition A:       Nodes $PARTITION_A_MIN-$PARTITION_A_MAX (expected leader: $PARTITION_A_MAX)"
 echo "Partition B:       Nodes $PARTITION_B_MIN-$PARTITION_B_MAX (expected leader: $PARTITION_B_MAX)"
@@ -363,7 +376,7 @@ run_trial() {
 
 # Export function and variables for parallel execution
 export -f run_trial
-export OUTPUT_BASE SIMULATION_FILE SCRIPTS_DIR DURATION NODE_COUNT USE_RANDOM_SEED ALGORITHM COOJA_JAR CONTIKI_DIR
+export OUTPUT_BASE SIMULATION_FILE SCRIPTS_DIR DURATION NODE_COUNT USE_RANDOM_SEED ALGORITHM BASE_ALGO TOPOLOGY COOJA_JAR CONTIKI_DIR
 export PARTITION_A_MIN PARTITION_A_MAX PARTITION_B_MIN PARTITION_B_MAX
 
 # Run trials in parallel

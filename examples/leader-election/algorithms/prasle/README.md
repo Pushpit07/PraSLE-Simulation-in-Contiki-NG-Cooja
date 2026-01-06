@@ -469,6 +469,97 @@ For **clique topology**, convergence time remains roughly constant or even *slig
 
 This is fundamentally different from Bully or Ring algorithms where convergence time scales with N. PraSLE's round-based design with topology-aware K values means clique networks converge in O(1) time regardless of size.
 
+## Running Topology Experiments
+
+The experiment framework supports running PraSLE with different network topologies. Each topology uses a topology-aware K value that scales appropriately with network size.
+
+### Running All Topology Experiments
+
+```bash
+# Navigate to the experiments directory
+cd examples/leader-election/experiments
+
+# Clique topology (default, K = 2) - fastest convergence
+# Runs all experiments (convergence, fault_tolerance, noise, network_partition)
+# with all node counts (5, 10, 50, 100) by default
+./run_all_experiments.sh --algorithm prasle --topology clique
+
+# Ring topology (K = (N+1)/2) - limit to smaller networks
+./run_all_experiments.sh --algorithm prasle --topology ring --nodes 5,10
+
+# Line topology (K = N) - limit to smaller networks
+./run_all_experiments.sh --algorithm prasle --topology line --nodes 5,10
+
+# Mesh topology (K ≈ 2√N)
+./run_all_experiments.sh --algorithm prasle --topology mesh --nodes 10,50
+
+# Or explicitly specify experiments and nodes:
+./run_all_experiments.sh --algorithm prasle --topology clique --experiments convergence,fault_tolerance,noise,network_partition --nodes 5,10,50,100
+```
+
+### Running All Experiments with Multiple Trials
+
+```bash
+# Clique topology - all experiments with 50 trials (uses defaults for experiments and nodes)
+./run_all_experiments.sh --algorithm prasle --topology clique --trials 50
+
+# Ring topology - 50 trials, limited to smaller networks
+./run_all_experiments.sh --algorithm prasle --topology ring --nodes 5,10,50 --trials 50
+
+# Line topology - 50 trials, limited to smaller networks
+./run_all_experiments.sh --algorithm prasle --topology line --nodes 5,10 --trials 50
+
+# Mesh topology - 50 trials
+./run_all_experiments.sh --algorithm prasle --topology mesh --nodes 10,50,100 --trials 50
+```
+
+### Generating Plots
+
+After running experiments, generate visualization plots:
+
+```bash
+cd examples/leader-election/experiments
+
+# Generate all plots for all completed experiments
+./generate_all_plots.sh
+
+# Or generate specific plot types
+./convergence/create-convergence-plot.sh
+./fault_tolerance/create-fault-tolerance-plot.sh
+./noise/create-noise-plot.sh
+./network_partition/create-partition-plot.sh
+
+# Using Python scripts for custom analysis
+cd ../scripts
+python3 plot_results.py --input ../results/prasle-ring/convergence/ --output ./plots/
+python3 plot_convergence_distribution.py --input ../results/prasle-ring/convergence/
+```
+
+### Analyzing Results
+
+```bash
+cd examples/leader-election/experiments
+
+# Run comprehensive analysis on all results
+./analyze.sh
+
+# Or analyze specific experiment types
+python3 fault_tolerance/analyze_recovery.py ../results/prasle-ring/fault_tolerance/
+python3 noise/analyze_noise.py ../results/prasle-ring/noise/
+python3 network_partition/analyze_partition.py ../results/prasle-ring/network_partition/
+```
+
+### Expected Convergence Times by Topology
+
+| Topology | K Formula | 5 Nodes | 10 Nodes | 50 Nodes | 100 Nodes |
+|----------|-----------|---------|----------|----------|-----------|
+| Clique   | K=2       | ~1.5s   | ~1.5s    | ~1.5s    | ~1.5s     |
+| Ring     | K=(N+1)/2 | ~1.5s   | ~3s      | ~13s     | ~25s      |
+| Mesh     | K≈2√N     | ~2s     | ~3.5s    | ~7.5s    | ~10s      |
+| Line     | K=N       | ~2.5s   | ~5s      | ~25s     | ~50s      |
+
+*Times are approximate and measured in FAST_MODE (T=0.5s per round)*
+
 ## Algorithm Comparison
 
 | Property | PraSLE | Bully | Ring |

@@ -56,6 +56,95 @@ Where:
 - Slower heartbeats (8s) reduce network traffic
 - Coordinator timeout (10s) is 1.25x heartbeat interval
 
+## Timing Modes: FAST_MODE vs Normal Mode
+
+All algorithms support two timing profiles to balance between realistic network simulation and efficient testing.
+
+### Why Two Modes?
+
+| Concern | Normal Mode | Fast Mode |
+|---------|-------------|-----------|
+| **Purpose** | Real wireless network deployment | Simulation testing & experiments |
+| **Timeouts** | Conservative (5-10s) | Aggressive (0.5-2s) |
+| **Convergence** | 10-30 seconds | 1-2 seconds |
+| **Use Case** | Production, real hardware | Cooja simulations, CI/CD |
+
+### Normal Mode (Default)
+
+**Designed for real wireless networks** where:
+- Message delivery is unreliable
+- Network latency is variable (10-500ms)
+- Nodes may be temporarily unreachable
+- False positives (detecting failure when node is alive) are costly
+
+| Parameter | Bully | Ring | PraSLE |
+|-----------|-------|------|--------|
+| Election timeout | 5s | 5s | - |
+| Coordinator timeout | 10s | 6s | - |
+| Heartbeat interval | 8s | 4s | - |
+| Round duration (T) | - | - | 1.0s |
+| Random delay max | 5s | 5s | 1.0s |
+
+**When to use Normal Mode:**
+- Deploying on real IoT hardware (e.g., Zolertia RE-Mote, TI CC2650)
+- Testing with real wireless interference
+- Evaluating algorithm behavior under realistic conditions
+- Validating fault tolerance with actual network delays
+
+### Fast Mode (FAST_MODE=1)
+
+**Designed for simulation testing** where:
+- Network is perfectly reliable (Cooja UDGM model)
+- Message delivery is instantaneous
+- Running hundreds of trials for statistical analysis
+- Time is the primary constraint
+
+| Parameter | Bully | Ring | PraSLE |
+|-----------|-------|------|--------|
+| Election timeout | 1s | 1s | - |
+| Coordinator timeout | 2s | 1.5s | - |
+| Heartbeat interval | 1.5s | 1s | - |
+| Round duration (T) | - | - | 0.5s |
+| Random delay max | 1s | 1s | 0.5s |
+
+**When to use Fast Mode:**
+- Running experiments in Cooja simulator
+- Collecting statistical data (100+ trials)
+- Quick development iteration
+- CI/CD pipeline testing
+- Comparing algorithm performance (same mode for fair comparison)
+
+### Enabling Fast Mode
+
+```bash
+# Via Makefile
+make ALGORITHM=bully TARGET=cooja FAST_MODE=1
+make ALGORITHM=ring TARGET=cooja FAST_MODE=1
+make ALGORITHM=prasle TARGET=cooja FAST_MODE=1
+
+# Via experiment scripts (automatically enabled)
+./run_all_experiments.sh --algorithm prasle --experiments convergence
+```
+
+**Note:** The experiment framework (`run_all_experiments.sh`) automatically enables FAST_MODE when generating CSC templates to ensure efficient experiment execution.
+
+### Timing Comparison
+
+| Metric | Normal Mode | Fast Mode | Speedup |
+|--------|-------------|-----------|---------|
+| Bully convergence | ~10-15s | ~1-2s | 7-10x |
+| Ring convergence (10 nodes) | ~15-20s | ~2-3s | 6-8x |
+| PraSLE convergence (K=2) | ~2-3s | ~1-1.5s | 2x |
+| Failure detection | 6-10s | 1.5-2s | 4-5x |
+| Single trial duration | 60-120s | 10-30s | 4-6x |
+
+### Important Considerations
+
+1. **Fair Comparison**: When comparing algorithms, always use the same mode for all algorithms
+2. **Results Validity**: Fast mode results are valid for algorithm comparison but not for real-world deployment estimates
+3. **Scaling**: Fast mode convergence times scale proportionally to normal mode (e.g., if Ring is 2x slower than Bully in fast mode, it will be ~2x slower in normal mode too)
+4. **Edge Cases**: Some race conditions or timing-dependent bugs may only appear in normal mode due to longer timeouts
+
 ## Failure Detection Time
 
 | Algorithm | Detection Time | Formula |
