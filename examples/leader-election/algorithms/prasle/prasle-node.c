@@ -198,15 +198,19 @@ is_better(uint16_t m1, uint16_t l1, uint16_t m2, uint16_t l2)
 
 /*---------------------------------------------------------------------------*/
 /**
- * \brief Check if a node is a logical neighbor
+ * \brief Check if a node is a logical neighbor based on the configured topology
  *
  * \param node_id  The node ID to check
  * \return true if node_id is a logical neighbor, false otherwise
  *
- * CRITICAL for PraSLE on UDP/IP:
- * Since UDP multicast (ff02::1) reaches ALL nodes in the network,
- * we must filter at the application level to only process messages
- * from logical neighbors defined by the topology.
+ * This function enforces topology constraints at the application layer.
+ * Since we use IPv6 multicast (ff02::1), ALL nodes receive every message.
+ * This filter ensures we only process messages from nodes that are our
+ * logical neighbors in the configured topology (ring, line, mesh, clique).
+ *
+ * This receiver-side filtering is more energy-efficient than sender-side
+ * filtering (unicast), which would require K radio transmissions instead of 1.
+ * The O(K) array lookup cost here is negligible compared to radio TX overhead.
  */
 static bool
 is_logical_neighbor(uint16_t node_id)
@@ -224,7 +228,25 @@ is_logical_neighbor(uint16_t node_id)
  * \brief Broadcast (mini, leaderi) to all neighbors via UDP multicast
  *
  * Uses IPv6 link-local all-nodes multicast (ff02::1) for broadcast.
- * All nodes receive the message; filtering is done at the receiver side.
+ * All nodes receive the message; filtering is done at the receiver side
+ * via is_logical_neighbor().
+ *
+ * DESIGN NOTE: Why broadcast instead of unicast to each logical neighbor?
+ *
+ * 1. ENERGY EFFICIENCY: In wireless IoT, radio transmission is the most
+ *    expensive operation. One broadcast costs the same as one unicast,
+ *    but reaching K neighbors via unicast requires K transmissions.
+ *    Example: 10-node clique -> 1 broadcast vs 9 unicasts = 9x energy savings.
+ *
+ * 2. PHYSICAL LAYER: Wireless is inherently broadcast - all nodes in radio
+ *    range receive every transmission regardless of addressing. Unicast
+ *    only filters at MAC layer, not physical layer.
+ *
+ * 3. SIMPLICITY: Broadcast requires no routing knowledge or address resolution.
+ *    Topology enforcement via is_logical_neighbor() at receiver is O(K) lookup.
+ *
+ * The receiver-side filtering cost (array search) is negligible compared to
+ * the cost of additional radio transmissions that sender-side filtering would require.
  */
 static void
 send_message_to_neighbors(void)

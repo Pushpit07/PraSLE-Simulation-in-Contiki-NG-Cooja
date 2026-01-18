@@ -60,10 +60,10 @@
 
 /**
  * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
- * - Set to 8 seconds to balance failure detection with network traffic
+ * - Set to 5 seconds for standardized comparison across algorithms
  */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (8 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (5 * CLOCK_SECOND)
 #endif
 
 /**

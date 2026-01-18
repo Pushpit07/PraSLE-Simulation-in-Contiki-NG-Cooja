@@ -40,6 +40,7 @@ TOPOLOGY="clique"  # Network topology for PraSLE (clique, ring, line, mesh)
 # Valid algorithms
 VALID_ALGORITHMS=("bully" "ring" "prasle" "adaptive-prasle")
 VALID_TOPOLOGIES=("clique" "ring" "line" "mesh")
+VALID_EXPERIMENTS=("convergence" "fault_tolerance" "noise" "network_partition")
 
 # Colors for output
 RED='\033[0;31m'
@@ -200,8 +201,20 @@ fi
 # Parse node counts
 IFS=',' read -ra NODES_ARRAY <<< "$NODE_COUNTS"
 
-# Parse experiments
-IFS=',' read -ra EXPERIMENTS_ARRAY <<< "$EXPERIMENTS"
+# Parse and validate experiments
+if [[ "$EXPERIMENTS" == "all" ]]; then
+    EXPERIMENTS_ARRAY=("${VALID_EXPERIMENTS[@]}")
+else
+    IFS=',' read -ra EXPERIMENTS_ARRAY <<< "$EXPERIMENTS"
+    # Validate each experiment
+    for exp in "${EXPERIMENTS_ARRAY[@]}"; do
+        if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${exp} " ]]; then
+            print_error "Invalid experiment: $exp"
+            print_error "Valid experiments: ${VALID_EXPERIMENTS[*]}"
+            exit 1
+        fi
+    done
+fi
 
 # Get parallel jobs
 PARALLEL_JOBS=$(detect_parallel_jobs)
@@ -372,6 +385,58 @@ get_csc_algo_dir() {
     fi
 }
 
+# Get crash time and duration for fault_tolerance experiments
+# Returns "crash_time duration" based on expected convergence time
+# For topologies with long convergence times, crash_time must be after initial convergence
+get_fault_tolerance_params() {
+    local algo=$1
+    local nodes=$2
+
+    # Default values
+    local crash_time=60
+    local duration=120
+
+    if [[ ("$algo" == "prasle" || "$algo" == "adaptive-prasle") && "$TOPOLOGY" != "clique" ]]; then
+        # PraSLE with non-clique topologies: crash_time and duration depend on K value
+        # K scales with network size, each round is 0.5s in FAST_MODE
+        case $TOPOLOGY in
+            ring)
+                # K = (N+1)/2, convergence ≈ K × 0.5s
+                case $nodes in
+                    50)  crash_time=30;  duration=90 ;;   # K=26, conv≈13s
+                    100) crash_time=40;  duration=120 ;;  # K=51, conv≈26s
+                    *)   crash_time=60;  duration=120 ;;
+                esac
+                ;;
+            line)
+                # K = N, convergence ≈ K × 0.5s
+                # Recovery also takes K × 0.5s
+                case $nodes in
+                    5)   crash_time=60;  duration=120 ;;  # K=5, conv≈2.5s
+                    10)  crash_time=60;  duration=120 ;;  # K=10, conv≈5s
+                    50)  crash_time=40;  duration=120 ;;  # K=50, conv≈25s
+                    100) crash_time=70;  duration=180 ;;  # K=100, conv≈50s, recovery≈50s
+                    *)   crash_time=60;  duration=120 ;;
+                esac
+                ;;
+            mesh)
+                # K ≈ 2√N, convergence ≈ K × 0.5s
+                case $nodes in
+                    50)  crash_time=60;  duration=120 ;;  # K≈14, conv≈7s
+                    100) crash_time=60;  duration=120 ;;  # K≈20, conv≈10s
+                    *)   crash_time=60;  duration=120 ;;
+                esac
+                ;;
+            *)
+                crash_time=60
+                duration=120
+                ;;
+        esac
+    fi
+
+    echo "$crash_time $duration"
+}
+
 for algo in "${ALGORITHMS[@]}"; do
     for exp in "${EXPERIMENTS_ARRAY[@]}"; do
         for nodes in "${NODES_ARRAY[@]}"; do
@@ -410,8 +475,10 @@ for algo in "${ALGORITHMS[@]}"; do
                         ;;
                     fault_tolerance)
                         if [[ -x "$SCRIPT_DIR/fault_tolerance/run_crash_trials.sh" ]]; then
+                            # Get topology-aware crash_time and duration
+                            read FT_CRASH_TIME FT_DURATION <<< $(get_fault_tolerance_params "$algo" "$nodes")
                             "$SCRIPT_DIR/fault_tolerance/run_crash_trials.sh" \
-                                "$csc_algo_dir" "$nodes" "$NUM_TRIALS" 60 120 "$PARALLEL_JOBS"
+                                "$csc_algo_dir" "$nodes" "$NUM_TRIALS" "$FT_CRASH_TIME" "$FT_DURATION" "$PARALLEL_JOBS"
                         else
                             print_warn "Fault tolerance trial script not found, skipping..."
                         fi

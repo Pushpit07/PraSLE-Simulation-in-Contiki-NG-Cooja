@@ -560,6 +560,26 @@ python3 network_partition/analyze_partition.py ../results/prasle-ring/network_pa
 
 *Times are approximate and measured in FAST_MODE (T=0.5s per round)*
 
+### Fault Tolerance Timing Parameters
+
+For fault tolerance experiments, the crash time and simulation duration are adjusted based on topology and network size to ensure recovery can complete:
+
+| Topology | Nodes | Crash Time | Duration | Rationale |
+|----------|-------|------------|----------|-----------|
+| Clique   | all   | 60s        | 120s     | K=2, fast convergence and recovery |
+| Ring     | 5-10  | 60s        | 120s     | K≤6, conv≈3s |
+| Ring     | 50    | 30s        | 90s      | K=26, conv≈13s |
+| Ring     | 100   | 40s        | 120s     | K=51, conv≈26s |
+| Line     | 5-10  | 60s        | 120s     | K≤10, conv≈5s |
+| Line     | 50    | 40s        | 120s     | K=50, conv≈25s |
+| Line     | 100   | 70s        | 180s     | K=100, conv≈50s, recovery≈50s |
+| Mesh     | all   | 60s        | 120s     | K≈2√N, moderate convergence |
+
+**Key considerations:**
+- Crash time must be after initial convergence completes
+- Duration must allow for crash_time + recovery_time + buffer
+- Recovery time ≈ initial convergence time (same K rounds needed)
+
 ## Algorithm Comparison
 
 | Property | PraSLE | Bully | Ring |

@@ -72,20 +72,19 @@
 
 /**
  * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
- * - Set to 6 seconds for faster failure detection
+ * - Set to 10 seconds for standardized comparison across algorithms
  * - Should be greater than ALIVE_INTERVAL to avoid false positives
  */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (6 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (10 * CLOCK_SECOND)
 #endif
 
 /**
  * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
- * - Set to 4 seconds for more frequent heartbeats
- * - Enables faster failure detection
+ * - Set to 5 seconds for standardized comparison across algorithms
  */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (4 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (5 * CLOCK_SECOND)
 #endif
 
 /**

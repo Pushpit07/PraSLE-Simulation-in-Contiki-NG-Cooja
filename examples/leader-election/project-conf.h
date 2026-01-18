@@ -12,14 +12,12 @@
  * Bully algorithm (CURRENT_ALGORITHM == 1): Uses IPv6 with RPL routing
  * Ring algorithm (CURRENT_ALGORITHM == 2): Uses IPv6 with RPL routing
  * PraSLE (CURRENT_ALGORITHM == 3): Uses IPv6 with RPL routing (paper specifies UDP/IP)
- * PraSLE-Custom (CURRENT_ALGORITHM == 4): Uses NullNet (no IPv6)
+ * Adaptive-PraSLE (CURRENT_ALGORITHM == 4): Uses IPv6 with RPL routing (same as PraSLE for fair comparison)
+ *
+ * All algorithms now use IPv6/UDP for consistency and fair comparison.
  */
-#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2 || CURRENT_ALGORITHM == 3  /* Bully, Ring, and PraSLE use IPv6 */
 #define NETSTACK_CONF_WITH_IPV6 1
 #define UIP_CONF_ROUTER 1
-#else /* PraSLE-Custom uses nullnet - no IPv6 */
-#define NETSTACK_CONF_WITH_IPV6 0
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Logging Configuration */
@@ -33,10 +31,8 @@
 #define LOG_CONF_LEVEL_MAIN                        LOG_LEVEL_INFO
 
 /*---------------------------------------------------------------------------*/
-/* Network Configuration - Algorithm-Specific */
+/* Network Configuration - All algorithms use IPv6/UDP */
 /*---------------------------------------------------------------------------*/
-
-#if CURRENT_ALGORITHM == 1 || CURRENT_ALGORITHM == 2 || CURRENT_ALGORITHM == 3  /* Bully, Ring, and PraSLE use IPv6 */
 
 /* UDP Configuration */
 #define UIP_CONF_UDP                               1
@@ -54,14 +50,6 @@
 #define RPL_CONF_DIO_INTERVAL_MIN                  12
 #define RPL_CONF_DIO_INTERVAL_DOUBLINGS            8
 #define RPL_CONF_DIO_REDUNDANCY                    10
-
-#else /* PraSLE-Custom uses nullnet */
-
-/* No UIP for nullnet-based algorithms */
-#define UIP_CONF_UDP                               0
-#define UIP_CONF_TCP                               0
-
-#endif
 
 /*---------------------------------------------------------------------------*/
 /* Buffer Configuration */
@@ -95,5 +83,6 @@
 #endif
 
 /* PraSLE parameters are defined in prasle-config.h */
+/* Adaptive-PraSLE parameters are defined in adaptive-prasle-config.h */
 
 #endif /* PROJECT_CONF_H_ */
