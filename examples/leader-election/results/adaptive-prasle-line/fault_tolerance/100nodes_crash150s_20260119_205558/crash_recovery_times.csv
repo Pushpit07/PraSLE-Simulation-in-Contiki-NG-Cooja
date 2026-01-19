@@ -1,0 +1,11 @@
+trial,algorithm,node_count,crash_time_s,initial_convergence_time_ms,recovery_convergence_time_ms,total_recovery_time_ms
+1,adaptive-prasle-line,100,150,1448,150542,542
+2,adaptive-prasle-line,100,150,1501,150595,595
+3,adaptive-prasle-line,100,150,1569,150663,663
+4,adaptive-prasle-line,100,150,1647,150776,776
+5,adaptive-prasle-line,100,150,1505,150601,601
+6,adaptive-prasle-line,100,150,1469,150563,563
+7,adaptive-prasle-line,100,150,1485,150325,325
+8,adaptive-prasle-line,100,150,1542,150636,636
+9,adaptive-prasle-line,100,150,1581,150691,691
+10,adaptive-prasle-line,100,150,1556,150650,650

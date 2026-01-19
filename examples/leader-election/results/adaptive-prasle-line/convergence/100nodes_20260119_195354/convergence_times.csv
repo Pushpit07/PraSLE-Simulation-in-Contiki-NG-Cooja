@@ -1,0 +1,11 @@
+trial,algorithm,node_count,convergence_time_ms
+1,adaptive-prasle-line,100,1646
+4,adaptive-prasle-line,100,1465
+2,adaptive-prasle-line,100,1567
+5,adaptive-prasle-line,100,1581
+6,adaptive-prasle-line,100,1576
+3,adaptive-prasle-line,100,1560
+8,adaptive-prasle-line,100,1546
+9,adaptive-prasle-line,100,1573
+7,adaptive-prasle-line,100,1515
+10,adaptive-prasle-line,100,1521

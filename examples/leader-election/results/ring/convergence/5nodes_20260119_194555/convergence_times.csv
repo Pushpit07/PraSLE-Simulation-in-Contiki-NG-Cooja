@@ -1,0 +1,11 @@
+trial,algorithm,node_count,convergence_time_ms
+2,ring,5,10078
+3,ring,5,9430
+1,ring,5,9978
+7,ring,5,10271
+4,ring,5,10104
+5,ring,5,9882
+6,ring,5,9732
+9,ring,5,9818
+8,ring,5,10009
+10,ring,5,9383

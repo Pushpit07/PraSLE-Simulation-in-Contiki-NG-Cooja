@@ -1,0 +1,11 @@
+trial,algorithm,node_count,convergence_time_ms
+5,bully,100,4494
+4,bully,100,4846
+2,bully,100,4233
+1,bully,100,4464
+3,bully,100,4585
+7,bully,100,4590
+9,bully,100,4519
+6,bully,100,4530
+10,bully,100,4585
+8,bully,100,4537
