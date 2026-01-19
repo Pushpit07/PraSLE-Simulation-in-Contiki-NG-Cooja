@@ -1135,7 +1135,13 @@ handle_message(const uint8_t *data, uint16_t len, const linkaddr_t *src)
          * Update our local state with the new coordinator,
          * then forward the message to continue the ring circuit.
          */
-        LOG_INFO("New coordinator announced: node %u\n", msg->candidate_id);
+        /* Check if this is an actual leader change (re-election) or just a heartbeat */
+        if(current_leader != msg->candidate_id) {
+          LOG_INFO("REELECTION_COMPLETE: New leader elected: node %u (previous: %u)\n",
+                   msg->candidate_id, current_leader);
+        } else {
+          LOG_DBG("Coordinator heartbeat from node %u\n", msg->candidate_id);
+        }
 
 #if ENABLE_DYNAMIC_RING
         /* Send ACK back to sender to confirm receipt */

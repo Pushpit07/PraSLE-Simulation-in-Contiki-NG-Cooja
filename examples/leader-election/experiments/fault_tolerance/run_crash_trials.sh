@@ -226,8 +226,8 @@ run_trial() {
         # Supported patterns for initial convergence:
         # - Bully: "becoming coordinator", "New coordinator"
         # - PraSLE: "CONVERGED: Leader"
-        # - Ring: "Final Leader"
-        local first_conv_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | grep -v "^METRICS" | head -1 | grep -oE '^[0-9]+' | head -1)
+        # - Ring: "Election completed", "REELECTION_COMPLETE"
+        local first_conv_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Election completed|REELECTION_COMPLETE" "$log_file" 2>/dev/null | grep -v "^METRICS" | head -1 | grep -oE '^[0-9]+' | head -1)
 
         if [ -n "$first_conv_us" ] && [ "$first_conv_us" -lt "$crash_time_us" ]; then
             # Convert microseconds to milliseconds
@@ -238,8 +238,8 @@ run_trial() {
         # Supported patterns for recovery:
         # - Bully: "becoming coordinator", "New coordinator"
         # - PraSLE: "Leader changed" (logged when leader value changes after crash)
-        # - Ring: "Final Leader"
-        local recovery_conv_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader|Leader changed" "$log_file" 2>/dev/null | \
+        # - Ring: "Election completed", "REELECTION_COMPLETE"
+        local recovery_conv_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Election completed|REELECTION_COMPLETE|Leader changed" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v crash="$crash_time_us" '{
                 match($0, /^[0-9]+/);

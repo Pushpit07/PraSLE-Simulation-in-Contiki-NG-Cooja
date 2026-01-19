@@ -587,23 +587,17 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         if [[ "$DRY_RUN" == "true" ]]; then
             echo "  [DRY RUN] python3 plot_node_comparison_charts.py -m convergence -o $CHART_DIR/convergence_by_nodes.png"
             echo "  [DRY RUN] python3 plot_node_comparison_charts.py -m messages -o $CHART_DIR/messages_by_nodes.png"
-            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -m convergence --separate -o $CHART_DIR/"
         else
             cd "$COMPARISON_DIR"
 
-            print_info "Generating convergence time comparison (combined)"
+            print_info "Generating convergence time comparison (2x2 grid)"
             python3 plot_node_comparison_charts.py -m convergence -o "$CHART_DIR/convergence_by_nodes.png" || {
                 print_warn "Failed to generate convergence chart"
             }
 
-            print_info "Generating message overhead comparison (combined)"
+            print_info "Generating message overhead comparison (2x2 grid)"
             python3 plot_node_comparison_charts.py -m messages -o "$CHART_DIR/messages_by_nodes.png" || {
                 print_warn "Failed to generate messages chart"
-            }
-
-            print_info "Generating convergence charts (separate)"
-            python3 plot_node_comparison_charts.py -m convergence --separate -o "$CHART_DIR/" || {
-                print_warn "Failed to generate separate convergence charts"
             }
         fi
     fi
@@ -614,18 +608,12 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
 
         if [[ "$DRY_RUN" == "true" ]]; then
             echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -o $CHART_DIR/recovery_by_nodes.png"
-            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py --separate -o $CHART_DIR/"
         else
             cd "$COMPARISON_DIR"
 
-            print_info "Generating recovery time comparison (combined)"
+            print_info "Generating recovery time comparison (2x2 grid)"
             python3 plot_recovery_comparison_charts.py -o "$CHART_DIR/recovery_by_nodes.png" || {
                 print_warn "Failed to generate recovery chart"
-            }
-
-            print_info "Generating recovery charts (separate)"
-            python3 plot_recovery_comparison_charts.py --separate -o "$CHART_DIR/" || {
-                print_warn "Failed to generate separate recovery charts"
             }
         fi
     fi
@@ -657,18 +645,12 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
 
         if [[ "$DRY_RUN" == "true" ]]; then
             echo "  [DRY RUN] python3 plot_partition_comparison_charts.py -o $CHART_DIR/partition_by_nodes.png"
-            echo "  [DRY RUN] python3 plot_partition_comparison_charts.py --separate -o $CHART_DIR/"
         else
             cd "$COMPARISON_DIR"
 
-            print_info "Generating partition comparison (combined)"
+            print_info "Generating partition comparison (2x2 grid)"
             python3 plot_partition_comparison_charts.py -o "$CHART_DIR/partition_by_nodes.png" || {
                 print_warn "Failed to generate partition chart"
-            }
-
-            print_info "Generating partition charts (separate)"
-            python3 plot_partition_comparison_charts.py --separate -o "$CHART_DIR/" || {
-                print_warn "Failed to generate separate partition charts"
             }
         fi
     fi

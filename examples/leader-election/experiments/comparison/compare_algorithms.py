@@ -102,7 +102,7 @@ plt.rcParams.update({
 
 def load_convergence_results(results_dir: Path, algorithm: str, node_count: int) -> Optional[Dict]:
     """Load convergence results for a specific algorithm and node count."""
-    results_path = results_dir / algorithm / 'convergence_trials'
+    results_path = results_dir / algorithm / 'convergence'
 
     if not results_path.exists():
         return None
@@ -148,7 +148,7 @@ def load_convergence_results(results_dir: Path, algorithm: str, node_count: int)
 
 def load_metrics_results(results_dir: Path, algorithm: str, node_count: int) -> Optional[Dict]:
     """Load detailed metrics from metrics.csv for a specific algorithm and node count."""
-    results_path = results_dir / algorithm / 'convergence_trials'
+    results_path = results_dir / algorithm / 'convergence'
 
     if not results_path.exists():
         return None
@@ -294,7 +294,7 @@ def plot_convergence_comparison(results_dir: Path, output_dir: Path, format: str
 
     if not HAS_MATPLOTLIB:
         print("  Skipping plot (matplotlib not available)")
-        return
+        return None
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -324,6 +324,7 @@ def plot_convergence_comparison(results_dir: Path, output_dir: Path, format: str
     plt.savefig(output_file, dpi=dpi, format=format)
     plt.close()
     print(f"  Saved: {output_file}")
+    return output_file
 
 
 def plot_scalability(results_dir: Path, output_dir: Path, format: str = 'png', dpi: int = 300):
@@ -336,7 +337,7 @@ def plot_scalability(results_dir: Path, output_dir: Path, format: str = 'png', d
 
     if not HAS_MATPLOTLIB:
         print("  Skipping plot (matplotlib not available)")
-        return
+        return None
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -370,7 +371,7 @@ def plot_scalability(results_dir: Path, output_dir: Path, format: str = 'png', d
     if not has_data:
         print("  No data available for scalability plot")
         plt.close()
-        return
+        return None
 
     ax.set_xlabel('Number of Nodes', fontweight='bold')
     ax.set_ylabel('Convergence Time (ms)', fontweight='bold')
@@ -396,6 +397,7 @@ def plot_scalability(results_dir: Path, output_dir: Path, format: str = 'png', d
     plt.savefig(output_file, dpi=dpi, format=format)
     plt.close()
     print(f"  Saved: {output_file}")
+    return output_file
 
 
 def plot_message_overhead(results_dir: Path, output_dir: Path, format: str = 'png', dpi: int = 300):
@@ -408,7 +410,7 @@ def plot_message_overhead(results_dir: Path, output_dir: Path, format: str = 'pn
 
     if not HAS_MATPLOTLIB:
         print("  Skipping plot (matplotlib not available)")
-        return
+        return None
 
     data = {}
     has_data = False
@@ -424,7 +426,7 @@ def plot_message_overhead(results_dir: Path, output_dir: Path, format: str = 'pn
     if not has_data:
         print("  No message overhead data found")
         print("  (Run experiments with metrics collection enabled)")
-        return
+        return None
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -454,6 +456,7 @@ def plot_message_overhead(results_dir: Path, output_dir: Path, format: str = 'pn
     plt.savefig(output_file, dpi=dpi, format=format)
     plt.close()
     print(f"  Saved: {output_file}")
+    return output_file
 
 
 def plot_fault_tolerance(results_dir: Path, output_dir: Path, format: str = 'png', dpi: int = 300):
@@ -466,7 +469,7 @@ def plot_fault_tolerance(results_dir: Path, output_dir: Path, format: str = 'png
 
     if not HAS_MATPLOTLIB:
         print("  Skipping plot (matplotlib not available)")
-        return
+        return None
 
     data = {}
     has_data = False
@@ -482,7 +485,7 @@ def plot_fault_tolerance(results_dir: Path, output_dir: Path, format: str = 'png
     if not has_data:
         print("  No fault tolerance data found")
         print("  (Run fault tolerance experiments first)")
-        return
+        return None
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -512,6 +515,7 @@ def plot_fault_tolerance(results_dir: Path, output_dir: Path, format: str = 'png
     plt.savefig(output_file, dpi=dpi, format=format)
     plt.close()
     print(f"  Saved: {output_file}")
+    return output_file
 
 
 def plot_state_distribution(results_dir: Path, output_dir: Path, format: str = 'png', dpi: int = 300):
@@ -525,7 +529,7 @@ def plot_state_distribution(results_dir: Path, output_dir: Path, format: str = '
 
     if not HAS_MATPLOTLIB:
         print("  Skipping plot (matplotlib not available)")
-        return
+        return None
 
     # Use a fixed node count for state distribution comparison
     node_count = 10  # Default to 10 nodes
@@ -550,7 +554,7 @@ def plot_state_distribution(results_dir: Path, output_dir: Path, format: str = '
 
     if not has_data:
         print("  No state distribution data found")
-        return
+        return None
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -580,6 +584,7 @@ def plot_state_distribution(results_dir: Path, output_dir: Path, format: str = '
     plt.savefig(output_file, dpi=dpi, format=format)
     plt.close()
     print(f"  Saved: {output_file}")
+    return output_file
 
 
 def generate_summary_table(results_dir: Path, output_dir: Path):
@@ -647,6 +652,7 @@ def generate_summary_table(results_dir: Path, output_dir: Path):
                 print(f"  {ALGORITHM_LABELS[algo]:<15} {nc:<6} {conv_str:<15} {msg_str:<12} {conv_result['count']:<8}")
 
     print("  " + "=" * 80)
+    return summary_file
 
 
 # =============================================================================
@@ -696,25 +702,43 @@ def main():
         print("  ./experiments/run_all_experiments.sh --algorithm all")
         sys.exit(1)
 
-    # Generate all comparison plots
-    plot_convergence_comparison(results_dir, output_dir, args.format, args.dpi)
-    plot_scalability(results_dir, output_dir, args.format, args.dpi)
-    plot_message_overhead(results_dir, output_dir, args.format, args.dpi)
-    plot_fault_tolerance(results_dir, output_dir, args.format, args.dpi)
-    plot_state_distribution(results_dir, output_dir, args.format, args.dpi)
-    generate_summary_table(results_dir, output_dir)
+    # Generate all comparison plots and collect generated files
+    generated_files = []
+
+    result = plot_convergence_comparison(results_dir, output_dir, args.format, args.dpi)
+    if result:
+        generated_files.append(result.name)
+
+    result = plot_scalability(results_dir, output_dir, args.format, args.dpi)
+    if result:
+        generated_files.append(result.name)
+
+    result = plot_message_overhead(results_dir, output_dir, args.format, args.dpi)
+    if result:
+        generated_files.append(result.name)
+
+    result = plot_fault_tolerance(results_dir, output_dir, args.format, args.dpi)
+    if result:
+        generated_files.append(result.name)
+
+    result = plot_state_distribution(results_dir, output_dir, args.format, args.dpi)
+    if result:
+        generated_files.append(result.name)
+
+    result = generate_summary_table(results_dir, output_dir)
+    if result:
+        generated_files.append(result.name)
 
     print("\n" + "=" * 70)
     print(" Comparison Complete")
     print("=" * 70)
     print(f"\nAll outputs saved to: {output_dir.absolute()}")
-    print("\nGenerated files:")
-    print(f"  - convergence_comparison.{args.format}")
-    print(f"  - scalability_comparison.{args.format}")
-    print(f"  - message_overhead_comparison.{args.format}")
-    print(f"  - fault_tolerance_comparison.{args.format}")
-    print(f"  - state_distribution_comparison.{args.format}")
-    print(f"  - summary_table.csv")
+    if generated_files:
+        print("\nGenerated files:")
+        for f in generated_files:
+            print(f"  - {f}")
+    else:
+        print("\nNo files were generated (no data available).")
 
 
 if __name__ == '__main__':
