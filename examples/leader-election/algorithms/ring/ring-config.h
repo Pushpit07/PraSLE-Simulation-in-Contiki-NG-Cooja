@@ -43,12 +43,20 @@
 #define ELECTION_TIMEOUT    (1 * CLOCK_SECOND)
 #endif
 
+/**
+ * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
+ * - Set to 3 seconds = 3x ALIVE_INTERVAL (tolerates 2 missed heartbeats + delay)
+ */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (3 * CLOCK_SECOND)
 #endif
 
+/**
+ * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
+ * - Set to 1 second for fast failure detection in simulations
+ */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (1 * CLOCK_SECOND)
 #endif
 
 #ifndef RANDOM_DELAY_MAX
@@ -57,14 +65,40 @@
 
 #else /* Normal mode */
 /*---------------------------------------------------------------------------*/
-/* NORMAL MODE: Conservative timeouts for real wireless networks */
+/* NORMAL MODE: Conservative timeouts for real wireless networks             */
 /*---------------------------------------------------------------------------*/
+/*
+ * RING ALGORITHM REFERENCE (Chang-Roberts):
+ * E. Chang and R. Roberts, "An improved algorithm for decentralized
+ * extrema-finding in circular configurations of processes,"
+ * Communications of the ACM, vol. 22, no. 5, pp. 281-283, May 1979.
+ * DOI: 10.1145/359104.359108
+ *
+ * ORIGINAL PAPER TIMING MODEL:
+ * The Chang-Roberts algorithm assumes synchronous, reliable communication.
+ * Message complexity: O(N²) worst case, O(N log N) average case.
+ * Election requires 2N-1 to 3N-1 messages in worst case.
+ *
+ * For practical implementation, timeouts must account for:
+ *   - Message must traverse entire ring (N hops)
+ *   - Each hop has delay T (max single-hop message time)
+ *   - Total ring traversal: N × T
+ *
+ * TIMING ADAPTATION FOR IoT/WSN:
+ * For 802.15.4-based wireless sensor networks:
+ *   - T (single-hop delay) = 50ms typical, 200ms worst case
+ *   - For N = 10 nodes: election timeout = 10 × 200ms = 2 seconds
+ *   - For N = 100 nodes: election timeout = 100 × 200ms = 20 seconds
+ *   - We use 5 seconds as balance for typical network sizes (10-50 nodes)
+ *   - Heartbeat interval = 2 seconds (same as Bully for fair comparison)
+ */
 
 /**
  * ELECTION_TIMEOUT: How long to wait for election to complete
- * - Set to 5 seconds to allow for larger networks and retransmissions
- * - Should be long enough for election to traverse the ring
- * - For 100-node networks, elections may need multiple retries
+ * - Chang-Roberts: Election message must traverse entire ring
+ * - Worst case: 3N-1 messages, but with parallel forwarding: ~N × T
+ * - Set to 5 seconds (supports up to ~25 nodes with 200ms/hop)
+ * - For larger networks, this should scale with RING_SIZE
  */
 #ifndef ELECTION_TIMEOUT
 #define ELECTION_TIMEOUT    (5 * CLOCK_SECOND)
@@ -72,26 +106,29 @@
 
 /**
  * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
- * - Set to 10 seconds for standardized comparison across algorithms
- * - Should be greater than ALIVE_INTERVAL to avoid false positives
+ * - Set to 2T = 4 seconds (matches Bully for fair comparison)
+ * - Tolerates one missed heartbeat in lossy networks
  */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (10 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
 #endif
 
 /**
  * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
- * - Set to 5 seconds for standardized comparison across algorithms
+ * - Set to T = 2 seconds (matches Bully for fair comparison)
+ * - Heartbeat circulates around the ring
  */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (5 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
 #endif
 
 /**
  * RANDOM_DELAY_MAX: Random startup delay to prevent synchronized elections
+ * - Prevents multiple nodes starting election simultaneously
+ * - Set to T = 2 seconds
  */
 #ifndef RANDOM_DELAY_MAX
-#define RANDOM_DELAY_MAX    (5 * CLOCK_SECOND)
+#define RANDOM_DELAY_MAX    (2 * CLOCK_SECOND)
 #endif
 
 #endif /* RING_FAST_MODE */

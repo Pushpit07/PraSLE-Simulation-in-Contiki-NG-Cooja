@@ -4,14 +4,23 @@
  *
  * Adaptive-PraSLE: Enhanced Self-Stabilizing Leader Election for IoT Networks
  *
- * This file contains configuration parameters, feature toggles, and data
- * structures for the Adaptive-PraSLE algorithm which extends standard PraSLE
- * with:
+ * BASE ALGORITHM REFERENCE (PraSLE):
+ * M. Conard and A. Ebnenasir, "A Practical Self-Stabilizing Leader Election
+ * for Networks of Resource-Constrained IoT Devices,"
+ * 17th European Dependable Computing Conference (EDCC), pp. 127-134, 2021.
+ * DOI: 10.1109/EDCC53658.2021.00025
+ *
+ * This implementation extends standard PraSLE with:
  *   1. Energy-aware leader selection
  *   2. Link-quality aware scoring
  *   3. Controlled leader rotation/handover
  *   4. Adaptive timeout management
  *   5. Backup-based fast recovery
+ *
+ * TIMING MODEL:
+ * Inherits PraSLE timing parameters (T, K) for fair comparison:
+ *   - Normal mode: T = 1.0s (Algorithm 1, Line 8)
+ *   - Fast mode: T = 0.1s (Paper Table I, IoT-Lab experiments)
  */
 
 #ifndef ADAPTIVE_PRASLE_CONFIG_H_
@@ -133,6 +142,42 @@
 #endif
 #endif
 
+/*===========================================================================*/
+/* TIMING CONFIGURATION - Two Profiles Available                              */
+/*===========================================================================*/
+/*
+ * Two timing profiles are available (matching PraSLE for fair comparison):
+ * - Normal mode (default): Conservative timeouts for real wireless networks
+ * - Fast mode (PRASLE_FAST_MODE): Reduced timeouts for quick testing/simulation
+ *
+ * To enable fast mode: make ALGORITHM=adaptive-prasle TARGET=cooja FAST_MODE=1
+ */
+
+#ifdef PRASLE_FAST_MODE
+/*---------------------------------------------------------------------------*/
+/* FAST MODE: Reduced round duration for testing                              */
+/*---------------------------------------------------------------------------*/
+/*
+ * Matches PraSLE FAST_MODE timing from paper Table I (IoT-Lab experiments):
+ *   - T = 0.1s (same as prasle-config.h)
+ *   - Startup delay = 0.25s max
+ *
+ * This ensures fair comparison between PraSLE and Adaptive-PraSLE.
+ */
+
+#ifndef T_SECONDS
+#define T_SECONDS 0.1
+#endif
+
+#ifndef STARTUP_DELAY_MAX
+#define STARTUP_DELAY_MAX (CLOCK_SECOND / 4)  /* 0.25s max random delay */
+#endif
+
+#else /* Normal mode */
+/*---------------------------------------------------------------------------*/
+/* NORMAL MODE: Conservative timeouts for real wireless networks             */
+/*---------------------------------------------------------------------------*/
+
 /* T: Maximum network latency in seconds (base value) */
 #ifndef T_SECONDS
 #ifdef PRASLE_T_SECONDS
@@ -141,6 +186,12 @@
 #define T_SECONDS 1.0
 #endif
 #endif
+
+#ifndef STARTUP_DELAY_MAX
+#define STARTUP_DELAY_MAX CLOCK_SECOND  /* 1.0s max random delay */
+#endif
+
+#endif /* PRASLE_FAST_MODE */
 
 #define CLOCK_SECOND_FLOAT ((float)CLOCK_SECOND)
 #define T_VALUE ((clock_time_t)(T_SECONDS * CLOCK_SECOND_FLOAT))
@@ -289,9 +340,9 @@
 /* ADAPTIVE TIMEOUT CONFIGURATION                                            */
 /*===========================================================================*/
 
-/* Minimum allowed timeout value (seconds) */
+/* Minimum allowed timeout value (seconds) - reduced for faster convergence */
 #ifndef TIMEOUT_MIN_SECONDS
-#define TIMEOUT_MIN_SECONDS        0.5
+#define TIMEOUT_MIN_SECONDS        0.15
 #endif
 
 /* Maximum allowed timeout value (seconds) */
@@ -301,22 +352,22 @@
 
 /* EWMA smoothing factor (0.0-1.0, higher = more weight to old estimate) */
 #ifndef TIMEOUT_ALPHA
-#define TIMEOUT_ALPHA             0.875  /* 7/8 for integer math */
+#define TIMEOUT_ALPHA             0.75   /* Faster RTT convergence */
 #endif
 
-/* Safety margin multiplier for timeout calculation */
+/* Safety margin multiplier for timeout calculation - reduced for faster convergence */
 #ifndef TIMEOUT_SAFETY_MARGIN
-#define TIMEOUT_SAFETY_MARGIN      1.5
+#define TIMEOUT_SAFETY_MARGIN      1.2
 #endif
 
-/* Initial RTT estimate in milliseconds */
+/* Initial RTT estimate in milliseconds - reduced for faster initial convergence */
 #ifndef INITIAL_RTT_ESTIMATE_MS
-#define INITIAL_RTT_ESTIMATE_MS    500
+#define INITIAL_RTT_ESTIMATE_MS    100
 #endif
 
-/* Initial RTT variance in milliseconds */
+/* Initial RTT variance in milliseconds - reduced for faster initial convergence */
 #ifndef INITIAL_RTT_VARIANCE_MS
-#define INITIAL_RTT_VARIANCE_MS    100
+#define INITIAL_RTT_VARIANCE_MS    25
 #endif
 
 /*===========================================================================*/

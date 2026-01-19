@@ -110,13 +110,11 @@ if [[ ! -f "$CSC_TEMPLATE" ]]; then
             --algorithm "$BASE_ALGO" \
             --nodes "$NODE_COUNT" \
             --topology "$TOPOLOGY" \
-            --fast-mode \
             --output "$SCRIPT_DIR/csc_templates/"
     else
         python3 "$PROJECT_DIR/scripts/generate_csc.py" \
             --algorithm "$BASE_ALGO" \
             --nodes "$NODE_COUNT" \
-            --fast-mode \
             --output "$SCRIPT_DIR/csc_templates/"
     fi
 fi

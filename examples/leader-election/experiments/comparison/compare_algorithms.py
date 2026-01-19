@@ -16,7 +16,7 @@ Usage:
     python3 compare_algorithms.py [options]
 
 Options:
-    --results-dir, -r    Directory containing experiment results (default: ../results)
+    --results-dir, -r    Directory containing experiment results (default: ../../results)
     --output, -o         Output directory for plots (default: ./comparison_plots)
     --dpi                DPI for saved plots (default: 300)
     --format             Output format: png, pdf, svg (default: png)
@@ -659,8 +659,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    parser.add_argument('--results-dir', '-r', default='../results',
-                        help='Directory containing experiment results (default: ../results)')
+    parser.add_argument('--results-dir', '-r', default='../../results',
+                        help='Directory containing experiment results (default: ../../results)')
     parser.add_argument('--output', '-o', default='./comparison_plots',
                         help='Output directory for plots (default: ./comparison_plots)')
     parser.add_argument('--dpi', type=int, default=300,
@@ -670,8 +670,17 @@ def main():
 
     args = parser.parse_args()
 
+    # Resolve paths relative to script directory if not absolute
+    script_dir = Path(__file__).parent
     results_dir = Path(args.results_dir)
+    if not results_dir.is_absolute():
+        results_dir = script_dir / results_dir
+    results_dir = results_dir.resolve()
+
     output_dir = Path(args.output)
+    if not output_dir.is_absolute():
+        output_dir = script_dir / output_dir
+    output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)

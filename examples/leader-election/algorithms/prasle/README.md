@@ -207,12 +207,43 @@ Since IPv6 multicast (ff02::1) reaches ALL nodes in the network, we implement **
 
 This ensures PraSLE operates correctly on logical topologies (ring, line, mesh, clique) even though the underlying network is fully connected
 
+## Timing Configuration
+
+### Timing Parameter T in the Paper
+
+The paper explicitly defines T in Algorithm 1, Line 8:
+
+> "T := 1.0" (default maximum network latency in seconds)
+
+T represents the maximum time a node waits for messages from neighbors in each round. The total convergence time is K × T seconds, where K is the number of rounds.
+
+### Normal Mode (Default)
+
+| Parameter | Value | Paper Reference |
+|-----------|-------|-----------------|
+| `PRASLE_T_SECONDS` | 1.0s | Algorithm 1, Line 8 |
+| `PRASLE_K_ROUNDS` | ≥ diameter | Section II |
+
+### Fast Mode (PRASLE_FAST_MODE=1)
+
+For faster testing and simulation, the paper's IoT-Lab experiments (Table I) used reduced timing:
+
+| Parameter | Value | Paper Reference |
+|-----------|-------|-----------------|
+| `PRASLE_T_SECONDS` | 0.1s | Table I (IoT-Lab experiments) |
+| `PRASLE_K_ROUNDS` | ≥ diameter | Section II |
+
+To enable fast mode:
+```bash
+make ALGORITHM=prasle TARGET=cooja FAST_MODE=1
+```
+
 ## Algorithm Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `PRASLE_K_ROUNDS` | 10 | Number of rounds (should be >= network diameter) |
-| `PRASLE_T_SECONDS` | 1.0 | Maximum network latency / round duration (seconds) |
+| `PRASLE_T_SECONDS` | 1.0 (normal) / 0.1 (fast) | Maximum network latency / round duration (seconds) |
 | `PRASLE_UNRELIABLE_MODE` | 1 | 0=reliable (terminates), 1=unreliable (continuous) |
 | `MAX_NEIGHBORS` | 8 | Maximum neighbors per node |
 | `N_MAX` | 100 | Maximum number of nodes in network |
@@ -670,7 +701,7 @@ if (round_counter <= 0) {
 
 ## References
 
-- Conard, M. & Ebnenasir, A. (2021). "A Practical Self-Stabilizing Leader Election for Networks of Resource-Constrained IoT Devices". EDCC 2021.
+- Conard, M. & Ebnenasir, A. (2021). "A Practical Self-Stabilizing Leader Election for Networks of Resource-Constrained IoT Devices," 17th European Dependable Computing Conference (EDCC), pp. 127-134. DOI: [10.1109/EDCC53658.2021.00025](https://doi.org/10.1109/EDCC53658.2021.00025)
 - Dolev, S. (2000). "Self-Stabilization". MIT Press.
 - Dijkstra, E.W. (1974). "Self-stabilizing systems in spite of distributed control". Communications of the ACM.
 - Implementation source code: https://github.com/maconard/cps-iot_leader-election

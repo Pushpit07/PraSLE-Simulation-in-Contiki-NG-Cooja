@@ -1496,8 +1496,8 @@ PROCESS_THREAD(adaptive_prasle_process, ev, data)
   metrics_output_header();
 #endif
 
-  /* Random startup delay */
-  etimer_set(&round_timer, (random_rand() % CLOCK_SECOND) + CLOCK_SECOND);
+  /* Random startup delay - uses STARTUP_DELAY_MAX from config (0.5s in FAST_MODE) */
+  etimer_set(&round_timer, (random_rand() % STARTUP_DELAY_MAX) + (STARTUP_DELAY_MAX / 2));
   PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&round_timer));
 
   start_time = clock_time();
@@ -1539,9 +1539,9 @@ PROCESS_THREAD(adaptive_prasle_process, ev, data)
     update_backup_list();
 #endif
 
-    /* Small inter-round delay */
+    /* Small inter-round delay - reduced for faster convergence */
     if (round_counter > 0) {
-      etimer_set(&round_timer, CLOCK_SECOND / 4);
+      etimer_set(&round_timer, CLOCK_SECOND / 10);
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&round_timer));
     }
   }

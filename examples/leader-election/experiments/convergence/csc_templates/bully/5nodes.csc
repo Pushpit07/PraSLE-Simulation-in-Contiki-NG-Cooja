@@ -19,7 +19,7 @@
       <identifier>bully1</identifier>
       <description>BULLY Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/bully-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) bully-node.cooja TARGET=cooja ALGORITHM=bully FAST_MODE=1</commands>
+      <commands>$(MAKE) -j$(CPUS) bully-node.cooja TARGET=cooja ALGORITHM=bully</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/build/cooja/bully-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>

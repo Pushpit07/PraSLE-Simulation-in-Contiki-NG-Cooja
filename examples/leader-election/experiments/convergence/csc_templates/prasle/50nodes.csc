@@ -19,7 +19,7 @@
       <identifier>prasle1</identifier>
       <description>PRASLE Node Type</description>
       <source>[CONTIKI_DIR]/examples/leader-election/prasle-node.c</source>
-      <commands>$(MAKE) -j$(CPUS) prasle-node.cooja TARGET=cooja ALGORITHM=prasle FAST_MODE=1</commands>
+      <commands>$(MAKE) -j$(CPUS) prasle-node.cooja TARGET=cooja ALGORITHM=prasle</commands>
       <firmware>[CONTIKI_DIR]/examples/leader-election/build/cooja/prasle-node.cooja</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.Battery</moteinterface>

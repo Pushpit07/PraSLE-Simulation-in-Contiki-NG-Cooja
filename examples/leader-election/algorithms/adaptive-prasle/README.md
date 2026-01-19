@@ -418,6 +418,37 @@ make ALGORITHM=adaptive-prasle TARGET=cooja \
      CFLAGS+="-DPRASLE_K_ROUNDS=5"
 ```
 
+## Timing Configuration
+
+Adaptive-PraSLE inherits its timing model from PraSLE (Conard & Ebnenasir, 2021) with additional adaptive timeout mechanisms.
+
+### Base Timing (From PraSLE Paper)
+
+Adaptive-PraSLE uses **identical timing** to PraSLE for fair comparison:
+
+| Parameter | Normal Mode | Fast Mode | Paper Reference |
+|-----------|-------------|-----------|-----------------|
+| `T_SECONDS` | 1.0s | 0.1s | Algorithm 1, Line 8 / Table I |
+| `K_ROUNDS` | ≥ diameter | ≥ diameter | Section II |
+| `STARTUP_DELAY_MAX` | 1.0s | 0.25s | - |
+
+To enable fast mode:
+```bash
+make ALGORITHM=adaptive-prasle TARGET=cooja FAST_MODE=1
+```
+
+### Adaptive Timeout Parameters
+
+When `ADAPTIVE_TIMEOUTS=1` (default), timeouts are dynamically adjusted based on observed network latency:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `INITIAL_RTT_ESTIMATE_MS` | 100ms | Starting RTT estimate |
+| `INITIAL_RTT_VARIANCE_MS` | 25ms | Starting RTT variance |
+| `TIMEOUT_SAFETY_MARGIN` | 1.2 | Safety multiplier |
+| `TIMEOUT_MIN_SECONDS` | 0.15s | Minimum allowed timeout |
+| `TIMEOUT_MAX_SECONDS` | 5.0s | Maximum allowed timeout |
+
 ## Configuration Summary
 
 ### Algorithm Parameters
@@ -425,7 +456,7 @@ make ALGORITHM=adaptive-prasle TARGET=cooja \
 | Parameter | Default | Range | Description |
 |-----------|---------|-------|-------------|
 | `K_ROUNDS` | topology-dependent | 2-N | Election rounds |
-| `T_SECONDS` | 1.0 | 0.1-10.0 | Round duration |
+| `T_SECONDS` | 1.0 (normal) / 0.1 (fast) | 0.1-10.0 | Round duration |
 | `MAX_NEIGHBORS` | 8 | 2-20 | Maximum tracked neighbors |
 | `N_MAX` | 100 | 10-1000 | Maximum network size |
 
@@ -547,8 +578,8 @@ algorithms/adaptive-prasle/
 
 ## References
 
+- Conard, M. & Ebnenasir, A. (2021). "A Practical Self-Stabilizing Leader Election for Networks of Resource-Constrained IoT Devices," 17th European Dependable Computing Conference (EDCC), pp. 127-134. DOI: [10.1109/EDCC53658.2021.00025](https://doi.org/10.1109/EDCC53658.2021.00025)
 - Beauquier, J., Blanchard, P., & Burman, J. (2013). Self-stabilizing Leader Election in Population Protocols
-- Conard, A. & Ebnenasir, A. (2021). "A Practical Self-Stabilizing Leader Election for Networks of Resource-Constrained IoT Devices"
 - Original PraSLE implementation in this repository
 - Contiki-NG Energest and Link-stats documentation
 - Jacobson, V. (1988). Congestion Avoidance and Control (RTT estimation)

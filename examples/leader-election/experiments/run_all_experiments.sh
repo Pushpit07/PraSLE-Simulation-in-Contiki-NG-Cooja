@@ -287,7 +287,6 @@ check_and_generate_csc() {
                 --nodes "$nodes" \
                 --experiment "$exp_type" \
                 $topo_flag \
-                --fast-mode \
                 --output "$SCRIPT_DIR/$exp_type/csc_templates/"
         else
             echo "  [DRY RUN] python3 generate_csc.py --algorithm $algo --nodes $nodes --experiment $exp_type --topology $TOPOLOGY"

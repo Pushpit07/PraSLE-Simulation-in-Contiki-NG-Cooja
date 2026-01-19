@@ -3,8 +3,12 @@
  * All rights reserved.
  *
  * PraSLE (Practical Self-Stabilizing Leader Election) Algorithm Configuration
- * Based on "A Practical Self-Stabilizing Leader Election for
- * Networks of Resource-Constrained IoT Devices" (Conard & Ebnenasir, 2021)
+ *
+ * PRASLE ALGORITHM REFERENCE:
+ * M. Conard and A. Ebnenasir, "A Practical Self-Stabilizing Leader Election
+ * for Networks of Resource-Constrained IoT Devices,"
+ * 17th European Dependable Computing Conference (EDCC), pp. 127-134, 2021.
+ * DOI: 10.1109/EDCC53658.2021.00025
  *
  * ALGORITHM OVERVIEW (Paper Algorithm 1, Figure 1):
  * ================================================
@@ -94,21 +98,49 @@
 
 #ifdef PRASLE_FAST_MODE
 /*---------------------------------------------------------------------------*/
-/* FAST MODE: Reduced timeouts for testing (~1-2 second convergence) */
+/* FAST MODE: Reduced timeouts based on paper's IoT-Lab experiments */
 /*---------------------------------------------------------------------------*/
+/*
+ * Paper Table I experimental values on IoT-Lab Cortex-M3 nodes:
+ *   - Clique topology: T = 0.05s - 0.1s
+ *   - Ring topology: T = 0.1s
+ *   - Line topology: T = 0.1s
+ *   - Mesh topology: T = 0.05s
+ *
+ * Using T = 0.1s as the FAST_MODE value for consistency with
+ * the paper's ring/line experiments and good performance.
+ */
 
 #ifndef PRASLE_T_SECONDS
-#define PRASLE_T_SECONDS 0.5
+#define PRASLE_T_SECONDS 0.1
 #endif
 
 #ifndef PRASLE_STARTUP_DELAY_MAX
-#define PRASLE_STARTUP_DELAY_MAX (CLOCK_SECOND / 2)  /* 0.5s max random delay */
+#define PRASLE_STARTUP_DELAY_MAX (CLOCK_SECOND / 4)  /* 0.25s max random delay */
 #endif
 
 #else /* Normal mode */
 /*---------------------------------------------------------------------------*/
 /* NORMAL MODE: Conservative timeouts for real wireless networks */
 /*---------------------------------------------------------------------------*/
+/*
+ * ORIGINAL PAPER TIMING MODEL (Algorithm 1, Line 8):
+ * Conard & Ebnenasir: "T := 1.0; // A tunable value"
+ *
+ * The default T = 1.0 second is the paper's conservative choice for
+ * general wireless networks. It provides:
+ *   - Tolerance for message delays in lossy networks
+ *   - Time for MAC-layer retransmissions
+ *   - Safety margin for multi-hop propagation
+ *
+ * Convergence time formula: K × T seconds
+ *   - Clique (K=2): 2 seconds
+ *   - Ring (K=N/2): 5 seconds for 10 nodes
+ *   - Line (K=N): 10 seconds for 10 nodes
+ *
+ * For faster convergence in controlled environments, use FAST_MODE
+ * with T = 0.1s (paper's experimental setting on IoT-Lab).
+ */
 
 #ifndef PRASLE_T_SECONDS
 #define PRASLE_T_SECONDS 1.0
@@ -141,15 +173,20 @@
 #endif
 
 /*
- * PRASLE_K_ROUNDS: Number of rounds (paper parameter K, Line 2)
+ * PRASLE_K_ROUNDS: Number of rounds (paper parameter K, Algorithm 1 Line 2)
  *
- * Paper: "K can initially be the diameter of the network"
+ * Paper Section III: "K can initially be the diameter of the network"
+ * Paper Table I experimental values:
+ *   - Clique (N nodes): K = 1-3 (diameter = 1)
+ *   - Ring (N nodes): K ≈ N/2 + 3 (diameter = ⌊N/2⌋)
+ *   - Line (N nodes): K = N (diameter = N-1)
+ *   - Mesh (L×W grid): K = L + W - 2 (diameter = L + W - 2)
  *
  * TOPOLOGY-AWARE DEFAULTS (when PRASLE_K_ROUNDS not explicitly set):
  * - Clique: K = 2 (diameter = 1, add 1 for safety margin)
- * - Ring:   K = (N+1)/2 (diameter = N/2)
- * - Line:   K = N (diameter = N-1)
- * - Mesh:   K ≈ 2*sqrt(N)
+ * - Ring:   K = (N+1)/2 (diameter = N/2, matches paper)
+ * - Line:   K = N (diameter = N-1, matches paper)
+ * - Mesh:   K ≈ 2*sqrt(N) (approximates L+W-2 for square grids)
  *
  * Can be overridden via Makefile: make ALGORITHM=prasle PRASLE_K_ROUNDS=5
  */

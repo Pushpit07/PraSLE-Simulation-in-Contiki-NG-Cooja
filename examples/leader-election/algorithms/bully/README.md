@@ -42,16 +42,52 @@ This implementation uses **IPv6 with RPL Lite routing** for communication:
 
 **Note**: Link-local multicast (`ff02::1`) only reaches nodes in direct radio range.
 
+## Paper Reference
+
+The Bully algorithm was introduced by Hector Garcia-Molina:
+
+> H. Garcia-Molina, "Elections in a Distributed Computing System,"
+> IEEE Transactions on Computers, vol. C-31, no. 1, pp. 48-59, Jan. 1982.
+> DOI: [10.1109/TC.1982.1675885](https://doi.org/10.1109/TC.1982.1675885)
+
+### Timing Parameter T in the Paper
+
+The paper defines the timing parameter **T** in Section III, page 50:
+
+> "T: an upper bound on the time required to send a message from any process to any other."
+
+The paper does **not** specify a concrete value for T, as it depends on the network characteristics. Our implementation uses **T = 2 seconds** as a practical adaptation for 802.15.4 wireless sensor networks.
+
 ## Timing Configuration
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `ELECTION_TIMEOUT` | 5 seconds | Time to wait for ANSWER messages during election |
-| `COORDINATOR_TIMEOUT` | 10 seconds | Time to wait for COORDINATOR announcement or detect leader failure |
-| `ALIVE_INTERVAL` | 8 seconds | Interval for leader heartbeat messages |
-| `RANDOM_DELAY_MAX` | 5 seconds | Maximum random startup delay |
+### Normal Mode (Default)
 
-**Important**: `COORDINATOR_TIMEOUT` should be > `ALIVE_INTERVAL` to prevent false-positive leader failures (currently 1.25x).
+Based on Garcia-Molina's timing model where T is the upper bound for message delivery:
+
+| Parameter | Value | Derivation | Description |
+|-----------|-------|------------|-------------|
+| `ELECTION_TIMEOUT` | 4s | 2T | Time to wait for ANSWER messages during election |
+| `COORDINATOR_TIMEOUT` | 4s | 2T | Time to wait for COORDINATOR announcement or detect leader failure |
+| `ALIVE_INTERVAL` | 2s | T | Interval for leader heartbeat messages |
+| `RANDOM_DELAY_MAX` | 2s | T | Maximum random startup delay |
+
+### Fast Mode (BULLY_FAST_MODE=1)
+
+Reduced timeouts for quick testing and simulation:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `ELECTION_TIMEOUT` | 1s | Faster response waiting |
+| `COORDINATOR_TIMEOUT` | 3s | Faster failure detection |
+| `ALIVE_INTERVAL` | 1s | More frequent heartbeats |
+| `RANDOM_DELAY_MAX` | 1s | Faster startup |
+
+To enable fast mode:
+```bash
+make ALGORITHM=bully TARGET=cooja FAST_MODE=1
+```
+
+**Important**: `COORDINATOR_TIMEOUT` should be > `ALIVE_INTERVAL` to prevent false-positive leader failures.
 
 ## Message Structure
 
@@ -275,4 +311,4 @@ if (sender_id >= my_node_id) {
 
 ## References
 
-- Garcia-Molina, H. (1982). "Elections in a Distributed Computing System"
+- Garcia-Molina, H. (1982). "Elections in a Distributed Computing System," IEEE Transactions on Computers, vol. C-31, no. 1, pp. 48-59. DOI: [10.1109/TC.1982.1675885](https://doi.org/10.1109/TC.1982.1675885)

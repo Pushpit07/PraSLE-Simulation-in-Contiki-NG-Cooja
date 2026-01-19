@@ -156,26 +156,49 @@ typedef struct {
 } ring_msg_t;  /* Total: 13 bytes */
 ```
 
+## Paper Reference
+
+The Ring algorithm (also known as Chang-Roberts algorithm) was introduced by:
+
+> E. Chang and R. Roberts, "An Improved Algorithm for Decentralized Extrema-Finding
+> in Circular Configurations of Processes,"
+> Communications of the ACM, vol. 22, no. 5, pp. 281-283, May 1979.
+> DOI: [10.1145/359104.359108](https://doi.org/10.1145/359104.359108)
+
+### Timing Model in the Paper
+
+The original Chang-Roberts algorithm assumes **synchronous, reliable communication** and does not define a timing parameter T. The algorithm is designed for systems where:
+- Message delivery is guaranteed
+- All processes operate in synchronous rounds
+
+For practical implementation in wireless sensor networks, we introduce timing parameters based on:
+- **T = 2 seconds**: Upper bound for single-hop message delay in 802.15.4 networks
+- **N×T**: Ring traversal time (N hops needed)
+
 ## Timing Configuration
 
 ### Normal Mode (Default)
 
-| Parameter | Value | Rationale |
-|-----------|-------|-----------|
-| `ELECTION_TIMEOUT` | 5 seconds | Time for election message to traverse ring |
-| `COORDINATOR_TIMEOUT` | 6 seconds | Failure detection (> ALIVE_INTERVAL) |
-| `ALIVE_INTERVAL` | 4 seconds | Heartbeat frequency for liveness |
-| `RANDOM_DELAY_MAX` | 5 seconds | Stagger startup to prevent synchronized elections |
-| `RING_SIZE` | 10 | Number of nodes in the ring (configurable) |
+| Parameter | Value | Derivation | Description |
+|-----------|-------|------------|-------------|
+| `ELECTION_TIMEOUT` | 5s | ~N×T | Time for election message to traverse ring |
+| `COORDINATOR_TIMEOUT` | 4s | 2T | Failure detection timeout |
+| `ALIVE_INTERVAL` | 2s | T | Heartbeat frequency for liveness |
+| `RANDOM_DELAY_MAX` | 2s | T | Stagger startup to prevent synchronized elections |
+| `RING_SIZE` | 10 | - | Number of nodes in the ring (configurable) |
+
+**Note**: ELECTION_TIMEOUT scales with ring size. For larger networks, consider adjusting this parameter.
 
 ### Fast Mode (RING_FAST_MODE=1)
 
-| Parameter | Value |
-|-----------|-------|
-| `ELECTION_TIMEOUT` | 1 second |
-| `COORDINATOR_TIMEOUT` | 4 seconds |
-| `ALIVE_INTERVAL` | 2 seconds |
-| `RANDOM_DELAY_MAX` | 1 second |
+Reduced timeouts for quick testing and simulation:
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `ELECTION_TIMEOUT` | 1s | Faster ring traversal assumption |
+| `COORDINATOR_TIMEOUT` | 3s | Faster failure detection |
+| `ALIVE_INTERVAL` | 1s | More frequent heartbeats |
+| `RANDOM_DELAY_MAX` | 1s | Faster startup |
 
 To enable fast mode:
 ```bash
@@ -379,5 +402,5 @@ Cooja simulation files are in `experiments/<type>/csc_templates/ring/`:
 
 ## References
 
-- Chang, E. & Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes"
+- Chang, E. & Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes," Communications of the ACM, vol. 22, no. 5, pp. 281-283. DOI: [10.1145/359104.359108](https://doi.org/10.1145/359104.359108)
 - Tel, G. (2000). "Introduction to Distributed Algorithms" - Chapter on Leader Election

@@ -29,9 +29,15 @@ This document describes how to run and analyze experiments for all leader electi
 | Algorithm | Description | Network Stack |
 |-----------|-------------|---------------|
 | `bully` | Classic Bully algorithm with highest-ID wins | IPv6/UDP |
-| `ring` | Ring-based leader election | nullnet |
-| `prasle` | PraSLE self-stabilizing algorithm | nullnet |
-| `adaptive-prasle` | Customized PraSLE variant | nullnet |
+| `ring` | Chang-Roberts ring-based leader election | IPv6/UDP |
+| `prasle` | PraSLE self-stabilizing algorithm | IPv6/UDP |
+| `adaptive-prasle` | Adaptive PraSLE with RTT-based timeouts | IPv6/UDP |
+
+**Topology Variants:** PraSLE and Adaptive-PraSLE support multiple network topologies. Use the topology suffix when running experiments:
+- `prasle-line`, `prasle-ring`, `prasle-mesh` (default: clique)
+- `adaptive-prasle-line`, `adaptive-prasle-ring`, `adaptive-prasle-mesh` (default: clique)
+
+This gives a total of **10 algorithm variants** for comprehensive evaluation.
 
 ## Experiment Types
 
@@ -906,7 +912,43 @@ This generates comparison plots showing:
 
 ## Run All Experiments (Complete Suite)
 
-Use the master script to run all experiments at once:
+### Complete Evaluation Script (Recommended)
+
+The `run_complete_evaluation.sh` script is the recommended way to run a full evaluation:
+
+```bash
+cd examples/leader-election/experiments
+
+# Run full evaluation (all 10 algorithm variants, all experiments)
+./run_complete_evaluation.sh
+
+# Quick test with 10 trials
+./run_complete_evaluation.sh -t 10
+
+# Run specific experiments for specific algorithms
+./run_complete_evaluation.sh -e convergence -a bully,ring,adaptive-prasle -t 50
+
+# Generate charts only (from existing results)
+./run_complete_evaluation.sh --skip-experiments
+
+# Run experiments only (no chart generation)
+./run_complete_evaluation.sh --skip-charts
+```
+
+**Key Features:**
+- Supports all 10 algorithm variants (including PraSLE and Adaptive-PraSLE topology variants)
+- **Automatically generates missing CSC templates** - no manual setup required
+- Generates comparison charts after experiments complete
+- Provides detailed progress reporting
+
+**Supported Algorithms (10 total):**
+- `bully`, `ring`
+- `prasle`, `prasle-line`, `prasle-ring`, `prasle-mesh`
+- `adaptive-prasle`, `adaptive-prasle-line`, `adaptive-prasle-ring`, `adaptive-prasle-mesh`
+
+### Basic Experiment Runner
+
+For simpler use cases, use `run_all_experiments.sh`:
 
 ```bash
 cd examples/leader-election/experiments

@@ -25,12 +25,20 @@
 #define ELECTION_TIMEOUT    (1 * CLOCK_SECOND)
 #endif
 
+/**
+ * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
+ * - Set to 3 seconds = 3x ALIVE_INTERVAL (tolerates 2 missed heartbeats + delay)
+ */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (3 * CLOCK_SECOND)
 #endif
 
+/**
+ * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
+ * - Set to 1 second for fast failure detection in simulations
+ */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (1 * CLOCK_SECOND)
 #endif
 
 #ifndef RANDOM_DELAY_MAX
@@ -39,38 +47,69 @@
 
 #else /* Normal mode */
 /*---------------------------------------------------------------------------*/
-/* NORMAL MODE: Conservative timeouts for real wireless networks */
+/* NORMAL MODE: Conservative timeouts for real wireless networks             */
 /*---------------------------------------------------------------------------*/
+/*
+ * BULLY ALGORITHM REFERENCE:
+ * H. Garcia-Molina, "Elections in a Distributed Computing System,"
+ * IEEE Transactions on Computers, vol. C-31, no. 1, pp. 48-59, Jan. 1982.
+ * DOI: 10.1109/TC.1982.1675885
+ *
+ * ORIGINAL PAPER TIMING MODEL:
+ * Garcia-Molina defines T as "the maximum time for a message to reach its
+ * destination." The algorithm uses the following timeouts:
+ *   - Election timeout: 2T (time for ELECTION msg + ANSWER response)
+ *   - Coordinator wait: T (time to receive COORDINATOR announcement)
+ *
+ * The paper assumes synchronous systems where T is a known upper bound.
+ * For asynchronous/lossy networks, T must account for:
+ *   - Wireless propagation and MAC layer delays
+ *   - Potential retransmissions due to packet loss
+ *   - Multi-hop routing delays (if applicable)
+ *
+ * TIMING ADAPTATION FOR IoT/WSN:
+ * For 802.15.4-based wireless sensor networks:
+ *   - T (max message delay) = 2 seconds (conservative for lossy links)
+ *   - Election timeout = 2T = 4 seconds
+ *   - Coordinator timeout = 2T = 4 seconds (detect missed announcement)
+ *   - Heartbeat interval = T = 2 seconds
+ */
 
 /**
  * ELECTION_TIMEOUT: How long to wait for ANSWER responses during election
- * - Set to 5 seconds to handle wireless network delays and packet loss
+ * - Garcia-Molina: 2T (round-trip for ELECTION + ANSWER)
+ * - With T = 2s for IoT: 2T = 4 seconds
  */
 #ifndef ELECTION_TIMEOUT
-#define ELECTION_TIMEOUT    (5 * CLOCK_SECOND)
+#define ELECTION_TIMEOUT    (4 * CLOCK_SECOND)
 #endif
 
 /**
  * COORDINATOR_TIMEOUT: How long to wait before declaring coordinator dead
- * - Set to 10 seconds = ~1.25x ALIVE_INTERVAL (detect missed heartbeat quickly)
+ * - Garcia-Molina: Uses T for coordinator announcement wait
+ * - Extended to 2T to tolerate one missed heartbeat in lossy networks
+ * - With T = 2s: 2T = 4 seconds
  */
 #ifndef COORDINATOR_TIMEOUT
-#define COORDINATOR_TIMEOUT (10 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
 #endif
 
 /**
  * ALIVE_INTERVAL: How often coordinator sends ALIVE heartbeat messages
- * - Set to 5 seconds for standardized comparison across algorithms
+ * - Set to T = 2 seconds (matches Garcia-Molina's message delay bound)
+ * - Coordinator sends heartbeat every T to prove liveness
  */
 #ifndef ALIVE_INTERVAL
-#define ALIVE_INTERVAL      (5 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
 #endif
 
 /**
  * RANDOM_DELAY_MAX: Random startup delay to prevent synchronized elections
+ * - Garcia-Molina notes importance of avoiding simultaneous elections
+ * - Set to T = 2 seconds
  */
 #ifndef RANDOM_DELAY_MAX
-#define RANDOM_DELAY_MAX    (5 * CLOCK_SECOND)
+#define RANDOM_DELAY_MAX    (2 * CLOCK_SECOND)
 #endif
 
 #endif /* BULLY_FAST_MODE */

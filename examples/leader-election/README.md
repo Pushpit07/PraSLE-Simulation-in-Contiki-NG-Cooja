@@ -156,18 +156,12 @@ Leader election algorithms typically use these states:
 
 ### Network Stack
 
-This framework supports two network stacks:
+All algorithms in this framework use the **IPv6/UDP stack**:
 
-**IPv6/UDP Stack** (used by Bully):
-- Transport: UDP on port 8765
-- Network: IPv6 with link-local multicast (`ff02::1`)
-- Routing: RPL Lite (lightweight routing protocol for IoT)
-- MAC: CSMA (Carrier Sense Multiple Access)
-
-**Nullnet Stack** (used by Ring, PraSLE, Adaptive-PraSLE):
-- Lightweight broadcast-based communication
-- Direct radio communication without IP overhead
-- Suitable for simple, single-hop networks
+- **Transport**: Simple UDP (via `simple-udp.h`) on port 8765
+- **Network**: IPv6 with link-local multicast (`ff02::1`)
+- **Routing**: RPL Lite (lightweight routing protocol for IoT)
+- **MAC**: CSMA (Carrier Sense Multiple Access)
 
 **Note**: Link-local multicast (`ff02::1`) only reaches nodes in direct radio range. For multi-hop communication, see the [Advanced: Multi-Hop Routing](#advanced-multi-hop-routing) section.
 
@@ -196,9 +190,26 @@ This framework supports two network stacks:
 | Algorithm | Description | Network Stack | Documentation |
 |-----------|-------------|---------------|---------------|
 | `bully` | Classic Bully algorithm with highest-ID wins | IPv6/UDP | [README](algorithms/bully/README.md) |
-| `ring` | Ring-based leader election | nullnet | [README](algorithms/ring/README.md) |
-| `prasle` | PraSLE self-stabilizing algorithm | nullnet | [README](algorithms/prasle/README.md) |
-| `adaptive-prasle` | Customized PraSLE variant | nullnet | [README](algorithms/adaptive-prasle/README.md) |
+| `ring` | Chang-Roberts ring-based leader election | IPv6/UDP | [README](algorithms/ring/README.md) |
+| `prasle` | PraSLE self-stabilizing algorithm | IPv6/UDP | [README](algorithms/prasle/README.md) |
+| `adaptive-prasle` | Adaptive PraSLE with RTT-based timeouts | IPv6/UDP | [README](algorithms/adaptive-prasle/README.md) |
+
+### Adaptive-PraSLE Features
+
+Adaptive-PraSLE extends the base PraSLE algorithm with intelligent timeout management:
+
+| Feature | Description |
+|---------|-------------|
+| **RTT-based Timeouts** | Dynamically adjusts timeouts based on measured network round-trip times |
+| **Jacobson/Karels Algorithm** | Uses TCP-style RTT estimation with smoothed RTT and variance tracking |
+| **Neighbor Activity Detection** | Monitors neighbor responsiveness to detect network conditions |
+| **Configurable Safety Margins** | Adjustable timeout multipliers for different reliability requirements |
+
+**Topology Support:** Both PraSLE and Adaptive-PraSLE support multiple network topologies:
+- `clique` (default) - Fully connected, K=2 rounds
+- `line` - Linear chain, K=N rounds
+- `ring` - Circular ring, K=N/2 rounds
+- `mesh` - 2D grid, K≈2√N rounds
 
 ## Directory Structure
 
@@ -214,7 +225,8 @@ leader-election/
 │   ├── election-metrics.h
 │   └── election-metrics.c
 ├── experiments/                   # Experiment runners and CSC templates
-│   ├── run_all_experiments.sh     # Master experiment runner
+│   ├── run_complete_evaluation.sh # Full evaluation with auto CSC generation (recommended)
+│   ├── run_all_experiments.sh     # Basic experiment runner
 │   ├── generate_all_plots.sh      # Master plot generator
 │   ├── convergence/
 │   │   ├── run_convergence_trials.sh
@@ -508,6 +520,60 @@ This gives **16 configurations** (1 algorithm × 4 node counts × 4 experiments)
 
 **Note:** The noise experiment runs 3 sub-experiments per configuration (50%, 70%, 90% packet success rates), so actual trial counts are higher than reported.
 
+### Complete Evaluation Script (Recommended)
+
+The `run_complete_evaluation.sh` script is the recommended way to run a full evaluation. It:
+- Supports all 10 algorithm variants (including PraSLE and Adaptive-PraSLE topology variants)
+- **Automatically generates missing CSC templates** (no manual setup required)
+- Generates comparison charts after experiments complete
+- Provides detailed progress reporting
+
+```bash
+cd experiments/
+
+# Show help
+./run_complete_evaluation.sh --help
+
+# Run full evaluation (all algorithms, all experiments) - takes many hours
+./run_complete_evaluation.sh
+
+# Quick test with 10 trials for 5 and 10 nodes only
+./run_complete_evaluation.sh -t 10 -n 5,10
+
+# Run only convergence experiments for specific algorithms
+./run_complete_evaluation.sh -e convergence -a bully,ring,adaptive-prasle -t 50
+
+# Generate charts from existing results (skip experiments)
+./run_complete_evaluation.sh --skip-experiments
+
+# Run experiments only, no chart generation
+./run_complete_evaluation.sh --skip-charts
+```
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--trials, -t` | Number of trials per configuration | 10 |
+| `--parallel, -p` | Number of parallel jobs | auto-detect |
+| `--experiments, -e` | Comma-separated experiments (or "all") | all |
+| `--algorithms, -a` | Comma-separated algorithms (or "all") | all |
+| `--nodes, -n` | Comma-separated node counts | 5,10,50,100 |
+| `--skip-experiments` | Skip running experiments, only generate charts | - |
+| `--skip-charts` | Skip chart generation, only run experiments | - |
+| `--dry-run` | Preview commands without executing | - |
+
+**Supported Algorithms (10 total):**
+
+| Base Algorithm | Topology Variants |
+|----------------|-------------------|
+| `bully` | - |
+| `ring` | - |
+| `prasle` | `prasle` (clique), `prasle-line`, `prasle-ring`, `prasle-mesh` |
+| `adaptive-prasle` | `adaptive-prasle` (clique), `adaptive-prasle-line`, `adaptive-prasle-ring`, `adaptive-prasle-mesh` |
+
+**Auto-Generated CSC Templates:** The script automatically detects and generates missing CSC configuration files for any algorithm/topology/experiment combination. This means you can run experiments for any configuration without manual CSC file creation.
+
 ---
 
 ### Convergence Experiments
@@ -789,6 +855,21 @@ python3 plot_convergence_distribution.py -i data.csv --title "Custom Title" --dp
 
 Generate Cooja simulation configuration files.
 
+### Automatic Generation (Recommended)
+
+The `run_complete_evaluation.sh` script **automatically generates missing CSC templates** when running experiments. This is the recommended approach as it handles all configurations automatically:
+
+```bash
+cd experiments/
+
+# CSC templates are auto-generated as needed - no manual setup required
+./run_complete_evaluation.sh -a bully,prasle-line -e convergence -t 10
+```
+
+### Manual Generation
+
+For manual CSC generation, use the `generate_csc.py` script:
+
 ```bash
 cd scripts/
 
@@ -797,6 +878,9 @@ python3 generate_csc.py --experiment all --output ../experiments/
 
 # Generate convergence templates for bully
 python3 generate_csc.py --algorithm bully --experiment convergence --output ../experiments/convergence/csc_templates/
+
+# Generate for PraSLE with specific topology
+python3 generate_csc.py --algorithm prasle --topology line --experiment convergence --output ../experiments/convergence/csc_templates/
 
 # Generate fault tolerance templates
 python3 generate_csc.py --experiment fault_tolerance --output ../experiments/fault_tolerance/csc_templates/
@@ -819,10 +903,15 @@ python3 generate_csc.py --algorithm bully --nodes 50 --experiment convergence --
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--algorithm, -a` | Algorithm (bully, ring, prasle, adaptive-prasle, all) | all |
+| `--topology` | Network topology for PraSLE/Adaptive-PraSLE (clique, line, ring, mesh) | clique |
 | `--nodes, -n` | Node count (5, 10, 50, 100) | all |
 | `--experiment, -e` | Experiment type | convergence |
 | `--noise-level` | Noise level for noise experiments (50, 70, 90) | all |
 | `--output, -o` | Output directory (required) | - |
+
+**Topology-Aware Output Directories:** When generating CSC templates with a non-clique topology, the output directory includes the topology name:
+- `prasle` with `--topology line` → `prasle-line/`
+- `adaptive-prasle` with `--topology ring` → `adaptive-prasle-ring/`
 
 ---
 
@@ -1229,11 +1318,63 @@ Keep the current implementation where:
 
 ---
 
+## Timing Configuration Reference
+
+This section documents the timing parameters for each algorithm, including paper references and the rationale for our implementation values.
+
+### Algorithm Paper References
+
+| Algorithm | Paper | DOI |
+|-----------|-------|-----|
+| **Bully** | Garcia-Molina, H. (1982). "Elections in a Distributed Computing System," IEEE Trans. on Computers, vol. C-31, no. 1, pp. 48-59 | [10.1109/TC.1982.1675885](https://doi.org/10.1109/TC.1982.1675885) |
+| **Ring** | Chang, E. & Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes," Communications of the ACM, vol. 22, no. 5, pp. 281-283 | [10.1145/359104.359108](https://doi.org/10.1145/359104.359108) |
+| **PraSLE** | Conard, M. & Ebnenasir, A. (2021). "A Practical Self-Stabilizing Leader Election for Networks of Resource-Constrained IoT Devices," 17th European Dependable Computing Conference (EDCC), pp. 127-134 | [10.1109/EDCC53658.2021.00025](https://doi.org/10.1109/EDCC53658.2021.00025) |
+
+### Timing Parameter T in Original Papers
+
+The fundamental timing parameter **T** (maximum message delay) is treated differently by each algorithm's original paper:
+
+| Algorithm | T Definition in Paper | Paper Location |
+|-----------|----------------------|----------------|
+| **Bully** | "T: an upper bound on the time required to send a message from any process to any other." No concrete value specified. | Section III, p.50 |
+| **Ring** | **T not defined.** Assumes synchronous, reliable communication. | N/A |
+| **PraSLE** | "T := 1.0" (default maximum network latency in seconds). | Algorithm 1, Line 8 |
+
+**Implementation Note**: Since the Bully and Ring papers do not specify concrete T values, we chose **T = 2 seconds** as a practical adaptation for 802.15.4 wireless networks, accounting for typical single-hop delays of 50-200ms in real IoT deployments.
+
+### Timing Configuration Comparison
+
+| Parameter | Bully (Normal) | Bully (Fast) | Ring (Normal) | Ring (Fast) | PraSLE (Normal) | PraSLE (Fast) |
+|-----------|----------------|--------------|---------------|-------------|-----------------|---------------|
+| **T (base delay)** | 2s | 1s | 2s | 1s | 1.0s | 0.1s |
+| **ELECTION_TIMEOUT** | 4s (2T) | 1s | 5s (N×T) | 1s | K×T | K×T |
+| **COORDINATOR_TIMEOUT** | 4s (2T) | 3s | 4s | 3s | N/A | N/A |
+| **ALIVE_INTERVAL** | 2s (T) | 1s | 2s | 2s | N/A | N/A |
+| **RANDOM_DELAY_MAX** | 2s | 1s | 2s | 1s | N/A | N/A |
+
+**Notes:**
+- **Bully timing model**: Based on Garcia-Molina's model where T is the upper bound for message delivery. Election timeout = 2T (wait for ANSWER) and coordinator timeout = 2T (tolerate one missed heartbeat).
+- **Ring timing model**: Election message must traverse the entire ring (N hops). Election timeout = N×T for worst case.
+- **PraSLE timing model**: T is the round duration. Total convergence time = K×T where K is the number of rounds (≥ network diameter).
+
+### FAST_MODE vs NORMAL_MODE
+
+- **NORMAL_MODE** (default): Conservative timeouts designed for real wireless network deployments with packet loss and interference.
+- **FAST_MODE** (`FAST_MODE=1`): Reduced timeouts for quick testing and simulation. Enables faster iteration during development.
+
+**When to use each mode:**
+- Use **NORMAL_MODE** for realistic performance evaluation and real hardware deployments
+- Use **FAST_MODE** for rapid testing, CI/CD pipelines, and development iterations
+
+**Note on PraSLE FAST_MODE**: The T=0.1s value comes from the paper's Table I (IoT-Lab experiments), where authors used reduced timing for testbed evaluation.
+
+---
+
 ## References
 
-- **Bully Algorithm**: Garcia-Molina, H. (1982). "Elections in a Distributed Computing System"
-- **Ring Algorithm**: Chang, E. and Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes"
-- **PraSLE**: Self-stabilizing probabilistic leader election for wireless sensor networks
+- **Bully Algorithm**: Garcia-Molina, H. (1982). "Elections in a Distributed Computing System," IEEE Transactions on Computers, vol. C-31, no. 1, pp. 48-59. DOI: [10.1109/TC.1982.1675885](https://doi.org/10.1109/TC.1982.1675885)
+- **Ring Algorithm**: Chang, E. & Roberts, R. (1979). "An Improved Algorithm for Decentralized Extrema-Finding in Circular Configurations of Processes," Communications of the ACM, vol. 22, no. 5, pp. 281-283. DOI: [10.1145/359104.359108](https://doi.org/10.1145/359104.359108)
+- **PraSLE Algorithm**: Conard, M. & Ebnenasir, A. (2021). "A Practical Self-Stabilizing Leader Election for Networks of Resource-Constrained IoT Devices," 17th European Dependable Computing Conference (EDCC), pp. 127-134. DOI: [10.1109/EDCC53658.2021.00025](https://doi.org/10.1109/EDCC53658.2021.00025)
 - **Contiki-NG Documentation**: https://github.com/contiki-ng/contiki-ng
 - **Cooja Simulator Guide**: Contiki-NG Wiki
 

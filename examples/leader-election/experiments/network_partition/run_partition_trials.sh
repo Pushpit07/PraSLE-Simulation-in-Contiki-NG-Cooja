@@ -155,11 +155,38 @@ esac
 # Set simulation file based on algorithm and node count
 SIMULATION_FILE="$CSC_TEMPLATES_DIR/$ALGORITHM/${NODE_COUNT}nodes-partition.csc"
 
-# Check if simulation file exists
+# Colors for output
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Check if simulation file exists, generate if not
 if [ ! -f "$SIMULATION_FILE" ]; then
-    echo "Error: Simulation file not found: $SIMULATION_FILE"
-    echo "You may need to generate CSC templates first using scripts/generate_csc.py"
-    exit 1
+    echo -e "${YELLOW}[WARN]${NC} CSC template not found: $SIMULATION_FILE"
+    echo "Generating CSC template..."
+
+    # Create output directory for this algorithm
+    mkdir -p "$CSC_TEMPLATES_DIR/$ALGORITHM"
+
+    if [[ -n "$TOPOLOGY" ]]; then
+        python3 "$PROJECT_DIR/scripts/generate_csc.py" \
+            --algorithm "$BASE_ALGO" \
+            --nodes "$NODE_COUNT" \
+            --topology "$TOPOLOGY" \
+            --experiment network_partition \
+            --output "$CSC_TEMPLATES_DIR/"
+    else
+        python3 "$PROJECT_DIR/scripts/generate_csc.py" \
+            --algorithm "$BASE_ALGO" \
+            --nodes "$NODE_COUNT" \
+            --experiment network_partition \
+            --output "$CSC_TEMPLATES_DIR/"
+    fi
+
+    # Verify the file was created
+    if [ ! -f "$SIMULATION_FILE" ]; then
+        echo "Error: Failed to generate CSC template: $SIMULATION_FILE"
+        exit 1
+    fi
 fi
 
 # Create output directory
