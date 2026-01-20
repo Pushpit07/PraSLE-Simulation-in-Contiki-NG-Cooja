@@ -214,6 +214,7 @@ def load_message_data(results_dir: Path, algorithm: str, node_count: int) -> Opt
     Load message overhead data for a specific algorithm and node count.
 
     Aggregates total messages from metrics.csv files across trials.
+    For each trial, gets the final metrics row for each node and sums messages_sent.
     """
     latest_dir = find_latest_results_dir(results_dir, algorithm, node_count)
 
@@ -236,14 +237,25 @@ def load_message_data(results_dir: Path, algorithm: str, node_count: int) -> Opt
             rows = list(reader)
 
             if rows:
-                # Get the last row (final metrics snapshot)
-                last_row = rows[-1]
-                try:
-                    msgs = int(last_row.get('messages_sent', 0))
-                    if msgs > 0:
-                        total_messages.append(msgs)
-                except (KeyError, ValueError):
-                    continue
+                # Group rows by node_id and keep the latest (highest timestamp) for each node
+                node_final_data = {}
+                for row in rows:
+                    try:
+                        node_id = int(row.get('node_id', 0))
+                        ts = int(row.get('timestamp', 0))
+                        msgs = int(row.get('messages_sent', 0))
+
+                        # Keep only the latest timestamp for each node
+                        if node_id not in node_final_data or ts > node_final_data[node_id][0]:
+                            node_final_data[node_id] = (ts, msgs)
+                    except (KeyError, ValueError):
+                        continue
+
+                if node_final_data:
+                    # Sum messages_sent across all nodes (using their final values)
+                    trial_total = sum(msgs for ts, msgs in node_final_data.values())
+                    if trial_total > 0:
+                        total_messages.append(trial_total)
 
     if not total_messages:
         return None

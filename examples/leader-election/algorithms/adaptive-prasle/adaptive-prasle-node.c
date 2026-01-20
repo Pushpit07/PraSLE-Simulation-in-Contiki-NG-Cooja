@@ -1578,6 +1578,11 @@ PROCESS_THREAD(adaptive_prasle_process, ev, data)
   round_counter = K_ROUNDS + 1;
   LOG_INFO("Starting election cycle %u\n", election_cycle);
 
+#if ENABLE_METRICS
+  /* Output metrics at the end of each election cycle */
+  metrics_output();
+#endif
+
   } /* End of continuous election loop */
 #endif
 

@@ -221,6 +221,15 @@ run_trial() {
         echo "Trial $trial: FAILED (no convergence detected)"
     fi
 
+    # Extract metrics data to metrics.csv
+    local metrics_file="$trial_output/metrics.csv"
+    if grep -q "METRICS," "$log_file"; then
+        # Extract header (remove Cooja timestamp and node ID prefix)
+        grep "METRICS_HEADER" "$log_file" | head -1 | sed 's/^[0-9]* [0-9]* METRICS_HEADER,//' > "$metrics_file"
+        # Extract data lines (remove Cooja timestamp and node ID prefix)
+        grep "^[0-9]* [0-9]* METRICS," "$log_file" | sed 's/^[0-9]* [0-9]* METRICS,//' >> "$metrics_file"
+    fi
+
     # Clean up temp CSC
     rm -f "$temp_csc"
 }

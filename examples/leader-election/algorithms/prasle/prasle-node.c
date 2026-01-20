@@ -625,6 +625,11 @@ PROCESS_THREAD(prasle_process, ev, data)
 
       LOG_INFO("Unreliable mode: Starting new election cycle %u\n", election_cycle);
 
+      #if ENABLE_METRICS
+      /* Output metrics at the end of each election cycle */
+      metrics_output();
+      #endif
+
       /* Continue to next iteration of the main loop */
       #else
       /*
