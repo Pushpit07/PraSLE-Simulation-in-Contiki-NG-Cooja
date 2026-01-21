@@ -284,12 +284,12 @@ run_trial() {
         # Supported patterns:
         # - Bully: "becoming coordinator", "New coordinator"
         # - PraSLE: "CONVERGED: Leader"
-        # - Ring: "Final Leader"
+        # - Ring: "Election completed! Winner is node X", "REELECTION_COMPLETE: New leader elected: node X"
 
         # For each partition, find the first convergence message
         # Log format: <timestamp> <node_id> [INFO: ...] <message>
         # Node ID is field 2 ($2), timestamp is field 1 ($1) in microseconds
-        local partition_a_us=$(grep -E "becoming coordinator|New coordinator|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
+        local partition_a_us=$(grep -E "becoming coordinator|New coordinator|CONVERGED: Leader|Final Leader|Election completed|REELECTION_COMPLETE" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_A_MIN" -v max="$PARTITION_A_MAX" '
                 { node_id = $2+0; if (node_id >= min && node_id <= max) { print $1; exit } }
@@ -300,7 +300,7 @@ run_trial() {
             partition_a_convergence="NA"
         fi
 
-        local partition_b_us=$(grep -E "becoming coordinator|New coordinator|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
+        local partition_b_us=$(grep -E "becoming coordinator|New coordinator|CONVERGED: Leader|Final Leader|Election completed|REELECTION_COMPLETE" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_B_MIN" -v max="$PARTITION_B_MAX" '
                 { node_id = $2+0; if (node_id >= min && node_id <= max) { print $1; exit } }
@@ -317,8 +317,8 @@ run_trial() {
         # Supported patterns:
         # - Bully: "becoming coordinator" (node ID in field 2), "New coordinator: node X"
         # - PraSLE: "CONVERGED: Leader = X" (leader ID after "= ")
-        # - Ring: "Final Leader: X"
-        partition_a_leader=$(grep -E "becoming coordinator|New coordinator:|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
+        # - Ring: "Election completed! Winner is node X", "REELECTION_COMPLETE: New leader elected: node X"
+        partition_a_leader=$(grep -E "becoming coordinator|New coordinator:|CONVERGED: Leader|Final Leader|Election completed|REELECTION_COMPLETE" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_A_MIN" -v max="$PARTITION_A_MAX" '
                 /becoming coordinator/ {
@@ -349,11 +349,29 @@ run_trial() {
                         if (node_id >= min && node_id <= max) last_leader = node_id
                     }
                 }
+                /Election completed.*Winner is node/ {
+                    # Ring format: "Election completed! Winner is node X"
+                    n = split($0, parts, "node ")
+                    if (n >= 2) {
+                        gsub(/[^0-9].*/, "", parts[n])
+                        node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /REELECTION_COMPLETE.*New leader.*node/ {
+                    # Ring format: "REELECTION_COMPLETE: New leader elected: node X"
+                    n = split($0, parts, "node ")
+                    if (n >= 2) {
+                        gsub(/[^0-9].*/, "", parts[n])
+                        node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
                 END { if (last_leader != "") print last_leader }
             ')
         [ -z "$partition_a_leader" ] && partition_a_leader="$PARTITION_A_MAX"
 
-        partition_b_leader=$(grep -E "becoming coordinator|New coordinator:|CONVERGED: Leader|Final Leader" "$log_file" 2>/dev/null | \
+        partition_b_leader=$(grep -E "becoming coordinator|New coordinator:|CONVERGED: Leader|Final Leader|Election completed|REELECTION_COMPLETE" "$log_file" 2>/dev/null | \
             grep -v "^METRICS" | \
             awk -v min="$PARTITION_B_MIN" -v max="$PARTITION_B_MAX" '
                 /becoming coordinator/ {
@@ -380,6 +398,24 @@ run_trial() {
                     n = split($0, parts, "Leader: ")
                     if (n >= 2) {
                         node_id = parts[2]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /Election completed.*Winner is node/ {
+                    # Ring format: "Election completed! Winner is node X"
+                    n = split($0, parts, "node ")
+                    if (n >= 2) {
+                        gsub(/[^0-9].*/, "", parts[n])
+                        node_id = parts[n]+0
+                        if (node_id >= min && node_id <= max) last_leader = node_id
+                    }
+                }
+                /REELECTION_COMPLETE.*New leader.*node/ {
+                    # Ring format: "REELECTION_COMPLETE: New leader elected: node X"
+                    n = split($0, parts, "node ")
+                    if (n >= 2) {
+                        gsub(/[^0-9].*/, "", parts[n])
+                        node_id = parts[n]+0
                         if (node_id >= min && node_id <= max) last_leader = node_id
                     }
                 }

@@ -222,7 +222,7 @@ run_trial() {
         if [ -z "$convergence_time" ] || [ "$convergence_time" = "NA" ]; then
             # Try alternative pattern - extract timestamp from log line
             # Note: Cooja log timestamps are in MICROSECONDS, convert to milliseconds
-            local timestamp_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader" "$log_file" 2>/dev/null | \
+            local timestamp_us=$(grep -E "CONVERGED|New coordinator|becoming coordinator|Final Leader|Election completed|REELECTION_COMPLETE" "$log_file" 2>/dev/null | \
                 head -1 | grep -oE '^[0-9]+' | head -1)
             if [ -n "$timestamp_us" ]; then
                 convergence_time=$((timestamp_us / 1000))

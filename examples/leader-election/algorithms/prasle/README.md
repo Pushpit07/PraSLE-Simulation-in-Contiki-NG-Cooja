@@ -695,9 +695,41 @@ if (round_counter <= 0) {
 
 ### High Message Overhead
 
-1. **Use reliable mode**: Only sends on value changes
-2. **Reduce K**: Fewer rounds after convergence
-3. **Avoid clique**: Clique has O(N²) message complexity
+**Why does PraSLE have high message overhead?**
+
+PraSLE's default configuration uses **unreliable mode** (`PRASLE_UNRELIABLE_MODE = 1`), which sends messages **unconditionally every round** for self-stabilization.
+
+**Code**: [prasle-node.c:553-556](prasle-node.c#L553-L556)
+```c
+#if PRASLE_UNRELIABLE_MODE
+    /* Unreliable mode: Always broadcast every round */
+    send_message_to_neighbors();
+#endif
+```
+
+**This is by design** - the original paper (Conard & Ebnenasir, 2021) specifies continuous broadcasting to:
+- Recover from arbitrary states (self-stabilization)
+- Handle transient faults (bit flips, memory corruption)
+- Operate in unreliable networks with message loss
+
+**Optimization options**:
+
+1. **Use reliable mode** (`PRASLE_UNRELIABLE_MODE = 0`): Only sends on value changes
+   - Reduces messages by 50-70%
+   - Loses some self-stabilization guarantees
+   - Requires explicit failure detection
+
+2. **Use Adaptive-PraSLE**: Maintains self-stabilization with lower overhead
+   - Uses periodic reset-cycles instead of continuous broadcasting
+   - 20-40% lower message overhead
+   - Same self-stabilization guarantees
+   - See [Adaptive-PraSLE README](../adaptive-prasle/README.md#self-stabilization-and-message-overhead)
+
+3. **Reduce K**: Fewer rounds after convergence
+   - May impact correctness in large networks
+
+4. **Avoid clique**: Clique has O(N²) message complexity
+   - Use line, ring, or mesh topologies instead
 
 ## References
 

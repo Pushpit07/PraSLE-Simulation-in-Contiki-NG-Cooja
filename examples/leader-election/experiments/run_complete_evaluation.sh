@@ -99,6 +99,20 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Clean Ring firmware to force rebuild with different RING_SIZE
+# Ring algorithm compiles RING_SIZE into the binary, so we need fresh builds
+# for each node count. Must clean both firmware AND object files.
+clean_ring_firmware() {
+    local build_dir="$PROJECT_DIR/build/cooja"
+    if [[ -d "$build_dir" ]]; then
+        # Clean firmware
+        rm -f "$build_dir"/ring-node.* "$build_dir"/mtype*.cooja 2>/dev/null || true
+        # Clean object file to force recompilation with new RING_SIZE
+        rm -f "$build_dir"/obj/ring-node.o 2>/dev/null || true
+        print_info "Cleaned Ring firmware and object cache"
+    fi
+}
+
 show_help() {
     echo "Complete Leader Election Algorithm Evaluation"
     echo ""
@@ -483,6 +497,11 @@ if [[ "$SKIP_EXPERIMENTS" != "true" ]]; then
                 DURATION=$(get_duration "$algo" "$nodes" "$exp")
 
                 print_info "Running $exp for $algo with $nodes nodes (duration: ${DURATION}s)"
+
+                # Ring algorithm needs fresh builds for each RING_SIZE
+                if [[ "$algo" == "ring" ]]; then
+                    clean_ring_firmware
+                fi
 
                 if [[ "$DRY_RUN" == "true" ]]; then
                     case $exp in
