@@ -690,6 +690,38 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         fi
     fi
 
+    # Generate per-algorithm charts (metrics and scalability for each algorithm)
+    print_section "Per-Algorithm Metrics Charts"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -o $CHART_DIR/per_algorithm/"
+    else
+        cd "$COMPARISON_DIR"
+
+        if [[ -f "plot_per_algorithm_charts.py" ]]; then
+            print_info "Generating per-algorithm metrics and scalability charts"
+            python3 plot_per_algorithm_charts.py -o "$CHART_DIR/per_algorithm/" || {
+                print_warn "Failed to generate per-algorithm charts"
+            }
+        fi
+    fi
+
+    # Generate messages vs convergence time trade-off chart
+    print_section "Messages vs Convergence Trade-off Charts"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -o $CHART_DIR/messages_vs_convergence.png"
+    else
+        cd "$COMPARISON_DIR"
+
+        if [[ -f "plot_messages_vs_convergence.py" ]]; then
+            print_info "Generating messages vs convergence time trade-off charts"
+            python3 plot_messages_vs_convergence.py -o "$CHART_DIR/messages_vs_convergence.png" || {
+                print_warn "Failed to generate messages vs convergence charts"
+            }
+        fi
+    fi
+
     print_info "Charts saved to: $CHART_DIR"
 fi
 
@@ -721,6 +753,13 @@ if [[ "$SKIP_CHARTS" != "true" && "$DRY_RUN" != "true" ]]; then
     if [[ -d "$PROJECT_DIR/results/comparison_charts" ]]; then
         ls -1 "$PROJECT_DIR/results/comparison_charts/"*.png 2>/dev/null | while read f; do
             echo "  - $(basename "$f")"
+        done
+    fi
+    echo ""
+    echo "Per-algorithm charts:"
+    if [[ -d "$PROJECT_DIR/results/comparison_charts/per_algorithm" ]]; then
+        ls -1 "$PROJECT_DIR/results/comparison_charts/per_algorithm/"*.png 2>/dev/null | while read f; do
+            echo "  - per_algorithm/$(basename "$f")"
         done
     fi
 fi

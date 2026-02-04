@@ -72,13 +72,6 @@ ALGORITHM_MARKERS = {
 
 NODE_COUNTS = [5, 10, 50, 100]
 
-# State colors for state distribution plot
-STATE_COLORS = {
-    'normal': '#4CAF50',     # Green
-    'election': '#FF9800',   # Orange
-    'waiting': '#2196F3'     # Blue
-}
-
 # Publication-quality plot settings
 plt.rcParams.update({
     'font.size': 11,
@@ -518,75 +511,6 @@ def plot_fault_tolerance(results_dir: Path, output_dir: Path, format: str = 'png
     return output_file
 
 
-def plot_state_distribution(results_dir: Path, output_dir: Path, format: str = 'png', dpi: int = 300):
-    """
-    Generate state distribution comparison stacked bar chart.
-
-    Shows percentage of time spent in each state (Normal, Election, Waiting)
-    for each algorithm.
-    """
-    print("\n=== State Distribution Comparison ===")
-
-    if not HAS_MATPLOTLIB:
-        print("  Skipping plot (matplotlib not available)")
-        return None
-
-    # Use a fixed node count for state distribution comparison
-    node_count = 10  # Default to 10 nodes
-
-    data = {}
-    has_data = False
-    for algo in ALGORITHMS:
-        result = load_metrics_results(results_dir, algo, node_count)
-        if result and 'state_distribution' in result:
-            has_data = True
-            sd = result['state_distribution']
-            total = sd['normal'] + sd['election'] + sd['waiting']
-            if total > 0:
-                data[algo] = {
-                    'normal': 100 * sd['normal'] / total,
-                    'election': 100 * sd['election'] / total,
-                    'waiting': 100 * sd['waiting'] / total
-                }
-                print(f"  {algo:15}: Normal={data[algo]['normal']:.1f}%, "
-                      f"Election={data[algo]['election']:.1f}%, "
-                      f"Waiting={data[algo]['waiting']:.1f}%")
-
-    if not has_data:
-        print("  No state distribution data found")
-        return None
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    algos = [a for a in ALGORITHMS if a in data]
-    x = np.arange(len(algos))
-
-    normal = [data[a]['normal'] for a in algos]
-    election = [data[a]['election'] for a in algos]
-    waiting = [data[a]['waiting'] for a in algos]
-
-    ax.bar(x, normal, label='Normal', color=STATE_COLORS['normal'], alpha=0.85)
-    ax.bar(x, election, bottom=normal, label='Election', color=STATE_COLORS['election'], alpha=0.85)
-    ax.bar(x, waiting, bottom=np.array(normal) + np.array(election),
-           label='Waiting', color=STATE_COLORS['waiting'], alpha=0.85)
-
-    ax.set_xlabel('Algorithm', fontweight='bold')
-    ax.set_ylabel('Time Distribution (%)', fontweight='bold')
-    ax.set_title(f'State Distribution Comparison ({node_count} nodes)', fontweight='bold', fontsize=13)
-    ax.set_xticks(x)
-    ax.set_xticklabels([ALGORITHM_LABELS[a] for a in algos])
-    ax.legend(loc='upper right', framealpha=0.9)
-    ax.set_ylim(0, 100)
-    ax.set_axisbelow(True)
-
-    plt.tight_layout()
-    output_file = output_dir / f'state_distribution_comparison.{format}'
-    plt.savefig(output_file, dpi=dpi, format=format)
-    plt.close()
-    print(f"  Saved: {output_file}")
-    return output_file
-
-
 def generate_summary_table(results_dir: Path, output_dir: Path):
     """
     Generate comprehensive summary table as CSV.
@@ -718,10 +642,6 @@ def main():
         generated_files.append(result.name)
 
     result = plot_fault_tolerance(results_dir, output_dir, args.format, args.dpi)
-    if result:
-        generated_files.append(result.name)
-
-    result = plot_state_distribution(results_dir, output_dir, args.format, args.dpi)
     if result:
         generated_files.append(result.name)
 

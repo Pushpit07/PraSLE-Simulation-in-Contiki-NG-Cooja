@@ -258,11 +258,11 @@ timeout = rtt_estimate + 4 * variance;
 
 **Configuration**:
 - `ADAPTIVE_TIMEOUTS` - Enable/disable feature (default: 1)
-- `TIMEOUT_MIN_SECONDS` - Minimum allowed timeout (default: 0.5s)
+- `TIMEOUT_MIN_SECONDS` - Minimum allowed timeout (default: 0.15s)
 - `TIMEOUT_MAX_SECONDS` - Maximum allowed timeout (default: 5.0s)
-- `TIMEOUT_SAFETY_MARGIN` - Multiplier for safety (default: 1.5)
-- `INITIAL_RTT_ESTIMATE_MS` - Starting RTT estimate (default: 500ms)
-- `INITIAL_RTT_VARIANCE_MS` - Starting variance (default: 100ms)
+- `TIMEOUT_SAFETY_MARGIN` - Multiplier for safety (default: 1.2)
+- `INITIAL_RTT_ESTIMATE_MS` - Starting RTT estimate (default: 100ms)
+- `INITIAL_RTT_VARIANCE_MS` - Starting variance (default: 25ms)
 
 ### 7. Reset-Cycle Fast Recovery (Default)
 
@@ -343,6 +343,47 @@ Link Freshness (confidence multiplier):
 | 5    | 90%    | -65  | 14    | 7         | 10% | 11.2  |
 
 Node 5 wins (lowest score) due to high energy, good connectivity, and low CPU usage.
+
+## Election Rounds and Cycles
+
+### What is a Round?
+
+A **round** is one iteration of the core election loop, consisting of two phases:
+
+```
+┌─────────────────────────────────────────────┐
+│                 ONE ROUND                   │
+├─────────────────┬───────────────────────────┤
+│  RECEIVE PHASE  │      UPDATE PHASE         │
+│   (T seconds)   │                           │
+├─────────────────┼───────────────────────────┤
+│ Wait & collect  │ If received better pair:  │
+│ messages from   │   - Update (mini, leaderi)│
+│ neighbors       │   - Broadcast to neighbors│
+└─────────────────┴───────────────────────────┘
+```
+
+1. **Receive Phase**: Node waits for `T_SECONDS` (1.0s normal, 0.1s fast mode), collecting messages from neighbors. Each received `(min_value, leader_id)` pair is compared against the current best.
+
+2. **Update Phase**: If a better (lower) pair was received, the node updates its own `(mini, leaderi)` and broadcasts the new values to neighbors.
+
+### What is an Election Cycle?
+
+An **election cycle** consists of `K_ROUNDS` consecutive rounds:
+
+```
+Election Cycle = K rounds
+                 ├── Round K   (receive T sec → update)
+                 ├── Round K-1 (receive T sec → update)
+                 ├── ...
+                 └── Round 0   (receive T sec → update → check convergence)
+```
+
+**Example**: With K=2 and T=1.0s, one election cycle takes ~2 seconds.
+
+### Why K Rounds?
+
+The algorithm needs **K ≥ network diameter** rounds to guarantee convergence. This ensures the best score can propagate from any node to all other nodes through the network topology.
 
 ## Topology-Aware K_ROUNDS
 
