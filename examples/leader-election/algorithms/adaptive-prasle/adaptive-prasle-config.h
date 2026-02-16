@@ -193,6 +193,29 @@
 
 #endif /* PRASLE_FAST_MODE */
 
+/*---------------------------------------------------------------------------*/
+/* STANDARDIZED MODE: Identical parameters for fair cross-algorithm comparison */
+/*---------------------------------------------------------------------------*/
+/*
+ * When STANDARDIZED_PARAMS is defined (via PARAM_CASE=2 in Makefile),
+ * all algorithms use the same timing parameters to enable fair comparison
+ * of algorithm efficiency rather than parameter tuning.
+ *
+ * For Adaptive-PraSLE, T is equivalent to the heartbeat interval in Bully/Ring:
+ *   - T = 2.0s (matches Bully/Ring ALIVE_INTERVAL)
+ *   - STARTUP_DELAY_MAX = 2.0s (matches Bully/Ring)
+ *
+ * This makes the broadcast rate equal across all algorithms,
+ * enabling fair comparison of message overhead.
+ */
+#ifdef STANDARDIZED_PARAMS
+#undef T_SECONDS
+#undef STARTUP_DELAY_MAX
+
+#define T_SECONDS 2.0
+#define STARTUP_DELAY_MAX (2 * CLOCK_SECOND)
+#endif /* STANDARDIZED_PARAMS */
+
 #define CLOCK_SECOND_FLOAT ((float)CLOCK_SECOND)
 #define T_VALUE ((clock_time_t)(T_SECONDS * CLOCK_SECOND_FLOAT))
 

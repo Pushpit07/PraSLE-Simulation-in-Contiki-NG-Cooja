@@ -115,6 +115,32 @@
 #endif /* BULLY_FAST_MODE */
 
 /*---------------------------------------------------------------------------*/
+/* STANDARDIZED MODE: Identical parameters for fair cross-algorithm comparison */
+/*---------------------------------------------------------------------------*/
+/*
+ * When STANDARDIZED_PARAMS is defined (via PARAM_CASE=2 in Makefile),
+ * all algorithms use the same timing parameters to enable fair comparison
+ * of algorithm efficiency rather than parameter tuning.
+ *
+ * Standardized values:
+ *   - ALIVE_INTERVAL = 2s (heartbeat period, matches PraSLE T=2s)
+ *   - COORDINATOR_TIMEOUT = 4s (2x heartbeat for failure detection)
+ *   - ELECTION_TIMEOUT = 4s (2x heartbeat for election responses)
+ *   - RANDOM_DELAY_MAX = 2s (equal startup jitter)
+ */
+#ifdef STANDARDIZED_PARAMS
+#undef ELECTION_TIMEOUT
+#undef COORDINATOR_TIMEOUT
+#undef ALIVE_INTERVAL
+#undef RANDOM_DELAY_MAX
+
+#define ELECTION_TIMEOUT    (4 * CLOCK_SECOND)
+#define COORDINATOR_TIMEOUT (4 * CLOCK_SECOND)
+#define ALIVE_INTERVAL      (2 * CLOCK_SECOND)
+#define RANDOM_DELAY_MAX    (2 * CLOCK_SECOND)
+#endif /* STANDARDIZED_PARAMS */
+
+/*---------------------------------------------------------------------------*/
 /* MESSAGE TYPES - Bully Algorithm Messages */
 /*---------------------------------------------------------------------------*/
 #define MSG_ELECTION    1  /* I'm starting an election */

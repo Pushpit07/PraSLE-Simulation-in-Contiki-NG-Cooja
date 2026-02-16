@@ -1368,6 +1368,69 @@ The fundamental timing parameter **T** (maximum message delay) is treated differ
 
 **Note on PraSLE FAST_MODE**: The T=0.1s value comes from the paper's Table I (IoT-Lab experiments), where authors used reduced timing for testbed evaluation.
 
+### Experiment Parameter Cases (PARAM_CASE)
+
+The framework supports two parameter cases for systematic algorithm comparison:
+
+| Case | Name | Description | Use When |
+|------|------|-------------|----------|
+| **1** | Original Paper | Each algorithm uses parameters from its original publication | Validating implementations, comparing to published benchmarks |
+| **2** | Standardized | All algorithms use identical timing parameters | Fair cross-algorithm comparison, thesis evaluation |
+
+**Usage:**
+
+```bash
+# Build with original paper parameters (default)
+make ALGORITHM=prasle TARGET=cooja PARAM_CASE=1
+
+# Build with standardized parameters
+make ALGORITHM=prasle TARGET=cooja PARAM_CASE=2
+
+# Run experiments with specific parameter case
+PARAM_CASE=1 ./experiments/run_complete_evaluation.sh
+./experiments/run_complete_evaluation.sh --param-case 2
+
+# Run both cases sequentially
+./experiments/run_both_cases.sh
+```
+
+**Parameter Comparison:**
+
+| Parameter | Case 1 (Original) | Case 2 (Standardized) |
+|-----------|-------------------|----------------------|
+| Bully/Ring ALIVE_INTERVAL | 2.0s | 2.0s |
+| Bully/Ring COORDINATOR_TIMEOUT | 4.0s | 4.0s |
+| PraSLE/Adaptive-PraSLE T | 1.0s | 2.0s |
+| Startup Delay Max | 1.0s (PraSLE) / 2.0s (Bully/Ring) | 2.0s (all) |
+
+**Why Two Cases?**
+
+- **Case 1**: Reproduces each algorithm's published performance characteristics
+- **Case 2**: Enables fair comparison by equalizing message broadcast rates (T=2s for all algorithms)
+
+In Case 1, PraSLE broadcasts twice as frequently (T=1s) as Bully/Ring (heartbeat=2s), which affects message overhead comparisons. Case 2 normalizes this by setting T=2s for PraSLE, making message counts directly comparable.
+
+**Results Organization:**
+
+```
+results/
+├── case1/                    # Original paper parameters
+│   ├── bully/
+│   ├── ring/
+│   ├── prasle/
+│   └── adaptive-prasle/
+├── case2/                    # Standardized parameters
+│   ├── bully/
+│   ├── ring/
+│   ├── prasle/
+│   └── adaptive-prasle/
+└── comparison_charts/
+    ├── case1/
+    └── case2/
+```
+
+See `results/case1/README.md` and `results/case2/README.md` for detailed parameter documentation.
+
 ---
 
 ## References

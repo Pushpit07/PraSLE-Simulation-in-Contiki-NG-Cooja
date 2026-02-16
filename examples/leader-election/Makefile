@@ -99,6 +99,14 @@ ifeq ($(FAST_MODE),1)
   endif
 endif
 
+# Parameter case for experiments
+# PARAM_CASE=1: Original paper parameters (default)
+# PARAM_CASE=2: Standardized parameters for fair cross-algorithm comparison
+PARAM_CASE ?= 1
+ifeq ($(PARAM_CASE),2)
+  CFLAGS += -DSTANDARDIZED_PARAMS=1
+endif
+
 # Ring size (number of nodes in ring topology, ring algorithm only)
 ifdef RING_SIZE
   CFLAGS += -DRING_SIZE=$(RING_SIZE)
@@ -209,8 +217,9 @@ help:
 	@echo "  ENABLE_METRICS=1        # Enable metrics (0 or 1)"
 	@echo "  MAX_NODES=100           # Maximum number of nodes"
 	@echo "  FAST_MODE=1             # Fast timing mode (reduced timeouts)"
+	@echo "  PARAM_CASE=1            # Parameter case: 1=original paper, 2=standardized"
 	@echo ""
-	@echo "PraSLE Topology Options:"
+	@echo "PraSLE Topology Options:
 	@echo "  TOPOLOGY=clique         # Fully connected (default, K=2)"
 	@echo "  TOPOLOGY=ring           # Circular ring (K=(N+1)/2)"
 	@echo "  TOPOLOGY=line           # Linear chain (K=N)"
@@ -227,6 +236,7 @@ help:
 	@echo "  ENABLE_METRICS=$(ENABLE_METRICS)"
 	@echo "  MAX_NODES=$(MAX_NODES)"
 	@echo "  FAST_MODE=$(FAST_MODE)"
+	@echo "  PARAM_CASE=$(PARAM_CASE)"
 
 # ============================================================
 # Include Contiki-NG Build System

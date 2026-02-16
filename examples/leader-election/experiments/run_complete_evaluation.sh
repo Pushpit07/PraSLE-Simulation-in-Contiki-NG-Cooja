@@ -61,6 +61,11 @@ SKIP_EXPERIMENTS=false
 SKIP_CHARTS=false
 DRY_RUN=false
 
+# Parameter case for experiments
+# PARAM_CASE=1: Original paper parameters (default)
+# PARAM_CASE=2: Standardized parameters for fair cross-algorithm comparison
+PARAM_CASE=${PARAM_CASE:-1}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -130,6 +135,7 @@ show_help() {
     echo "  --skip-experiments  Skip running experiments, only generate charts"
     echo "  --skip-charts       Skip chart generation, only run experiments"
     echo "  --dry-run           Preview commands without executing"
+    echo "  --param-case, -c    Parameter case: 1=original paper, 2=standardized (default: 1)"
     echo "  --help, -h          Show this help message"
     echo ""
     echo "Algorithms:"
@@ -394,6 +400,10 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=true
             shift
             ;;
+        --param-case|-c)
+            PARAM_CASE="$2"
+            shift 2
+            ;;
         --help|-h)
             show_help
             exit 0
@@ -445,6 +455,7 @@ echo "  Node counts:    ${NODE_ARRAY[*]}"
 echo "  Experiments:    ${EXP_ARRAY[*]}"
 echo "  Trials:         $NUM_TRIALS"
 echo "  Parallel jobs:  $PARALLEL_JOBS"
+echo "  Param case:     $PARAM_CASE (1=original paper, 2=standardized)"
 echo "  Skip experiments: $SKIP_EXPERIMENTS"
 echo "  Skip charts:    $SKIP_CHARTS"
 echo "  Dry run:        $DRY_RUN"
@@ -486,6 +497,9 @@ fi
 
 if [[ "$SKIP_EXPERIMENTS" != "true" ]]; then
     print_header "Running Experiments"
+
+    # Export PARAM_CASE for subscripts
+    export PARAM_CASE
 
     START_TIME=$(date +%s)
 
@@ -585,7 +599,7 @@ fi
 if [[ "$SKIP_CHARTS" != "true" ]]; then
     print_header "Generating Comparison Charts"
 
-    CHART_DIR="$PROJECT_DIR/results/comparison_charts"
+    CHART_DIR="$PROJECT_DIR/results/case${PARAM_CASE}/comparison_charts"
 
     if [[ "$DRY_RUN" != "true" ]]; then
         mkdir -p "$CHART_DIR"

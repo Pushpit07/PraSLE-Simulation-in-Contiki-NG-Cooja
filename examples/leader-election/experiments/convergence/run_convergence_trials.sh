@@ -32,6 +32,9 @@ NUM_TRIALS=${3:-100}
 DURATION=${4:-60}
 PARALLEL_JOBS=${5:-""}
 
+# Parameter case (inherited from environment or default to 1)
+PARAM_CASE=${PARAM_CASE:-1}
+
 # Extract base algorithm and topology from ALGORITHM parameter
 # e.g., "prasle-ring" -> BASE_ALGO="prasle", TOPOLOGY="ring"
 # e.g., "bully" -> BASE_ALGO="bully", TOPOLOGY=""
@@ -71,9 +74,9 @@ fi
 # CSC template path
 CSC_TEMPLATE="$SCRIPT_DIR/csc_templates/$ALGORITHM/${NODE_COUNT}nodes.csc"
 
-# Output directory
+# Output directory (includes case number for organization)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-OUTPUT_DIR="$PROJECT_DIR/results/$ALGORITHM/convergence/${NODE_COUNT}nodes_$TIMESTAMP"
+OUTPUT_DIR="$PROJECT_DIR/results/case${PARAM_CASE}/$ALGORITHM/convergence/${NODE_COUNT}nodes_$TIMESTAMP"
 
 # Colors
 GREEN='\033[0;32m'
@@ -97,6 +100,7 @@ echo "Node count:     $NODE_COUNT"
 echo "Trials:         $NUM_TRIALS"
 echo "Duration:       ${DURATION}s"
 echo "Parallel jobs:  $PARALLEL_JOBS"
+echo "Param case:     $PARAM_CASE (1=original, 2=standardized)"
 echo "CSC template:   $CSC_TEMPLATE"
 echo "Output dir:     $OUTPUT_DIR"
 echo ""

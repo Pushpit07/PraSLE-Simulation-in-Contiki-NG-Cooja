@@ -81,6 +81,9 @@ CRASH_TIME=${ARGS[3]:-60}
 DURATION=${ARGS[4]:-120}
 PARALLEL_JOBS=${ARGS[5]:-0}  # 0 means auto-detect
 
+# Parameter case (inherited from environment or default to 1)
+PARAM_CASE=${PARAM_CASE:-1}
+
 # Validate algorithm - supports base algorithms and topology variants
 # e.g., "prasle-ring" -> BASE_ALGO="prasle", TOPOLOGY="ring"
 # e.g., "bully" -> BASE_ALGO="bully", TOPOLOGY=""
@@ -132,8 +135,8 @@ if [ ! -f "$SIMULATION_FILE" ]; then
     exit 1
 fi
 
-# Create output directory
-OUTPUT_BASE="$PROJECT_DIR/results/$ALGORITHM/fault_tolerance/${NODE_COUNT}nodes_crash${CRASH_TIME}s_$(date +%Y%m%d_%H%M%S)"
+# Create output directory (includes case number for organization)
+OUTPUT_BASE="$PROJECT_DIR/results/case${PARAM_CASE}/$ALGORITHM/fault_tolerance/${NODE_COUNT}nodes_crash${CRASH_TIME}s_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUTPUT_BASE"
 
 # Output CSV file
@@ -147,6 +150,7 @@ if [[ -n "$TOPOLOGY" ]]; then
     echo "Base algorithm:    $BASE_ALGO"
     echo "Topology:          $TOPOLOGY"
 fi
+echo "Param case:        $PARAM_CASE (1=original, 2=standardized)"
 echo "Node count:        $NODE_COUNT nodes"
 echo "Simulation file:   $SIMULATION_FILE"
 echo "Number of trials:  $NUM_TRIALS"
