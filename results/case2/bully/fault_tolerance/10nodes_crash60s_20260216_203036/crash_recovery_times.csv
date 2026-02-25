@@ -1,0 +1,11 @@
+trial,algorithm,node_count,crash_time_s,initial_convergence_time_ms,recovery_convergence_time_ms,total_recovery_time_ms
+1,bully,10,60,6214,66241,6241
+2,bully,10,60,5563,67606,7606
+3,bully,10,60,5962,67987,7987
+4,bully,10,60,4308,67384,7384
+5,bully,10,60,5856,67889,7889
+6,bully,10,60,4871,66893,6893
+7,bully,10,60,5155,67194,7194
+8,bully,10,60,6283,66307,6307
+9,bully,10,60,5651,67684,7684
+10,bully,10,60,5790,67824,7824

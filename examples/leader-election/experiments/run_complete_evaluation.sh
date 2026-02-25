@@ -606,6 +606,7 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
     fi
 
     COMPARISON_DIR="$SCRIPT_DIR/comparison"
+    RESULTS_DIR="$PROJECT_DIR/results/case${PARAM_CASE}"
 
     # Check if Python scripts exist
     if [[ ! -d "$COMPARISON_DIR" ]]; then
@@ -618,18 +619,18 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         print_section "Convergence Charts"
 
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -m convergence -o $CHART_DIR/convergence_by_nodes.png"
-            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -m messages -o $CHART_DIR/messages_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m convergence -o $CHART_DIR/convergence_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m messages -o $CHART_DIR/messages_by_nodes.png"
         else
             cd "$COMPARISON_DIR"
 
             print_info "Generating convergence time comparison (2x2 grid)"
-            python3 plot_node_comparison_charts.py -m convergence -o "$CHART_DIR/convergence_by_nodes.png" || {
+            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m convergence -o "$CHART_DIR/convergence_by_nodes.png" || {
                 print_warn "Failed to generate convergence chart"
             }
 
             print_info "Generating message overhead comparison (2x2 grid)"
-            python3 plot_node_comparison_charts.py -m messages -o "$CHART_DIR/messages_by_nodes.png" || {
+            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m messages -o "$CHART_DIR/messages_by_nodes.png" || {
                 print_warn "Failed to generate messages chart"
             }
         fi
@@ -640,13 +641,19 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         print_section "Fault Tolerance Charts"
 
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -o $CHART_DIR/recovery_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR -o $CHART_DIR/recovery_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR --grid-3x2 -o $CHART_DIR/recovery_4x3_grid.png"
         else
             cd "$COMPARISON_DIR"
 
             print_info "Generating recovery time comparison (2x2 grid)"
-            python3 plot_recovery_comparison_charts.py -o "$CHART_DIR/recovery_by_nodes.png" || {
+            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR/recovery_by_nodes.png" || {
                 print_warn "Failed to generate recovery chart"
+            }
+
+            print_info "Generating recovery time comparison (4x3 grid)"
+            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" --grid-3x2 -o "$CHART_DIR/recovery_4x3_grid.png" || {
+                print_warn "Failed to generate recovery 4x3 grid chart"
             }
         fi
     fi
@@ -657,7 +664,7 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
 
         if [[ "$DRY_RUN" == "true" ]]; then
             for noise in 90 70 50; do
-                echo "  [DRY RUN] python3 plot_noise_comparison_charts.py -n $noise -o $CHART_DIR/noise${noise}_by_nodes.png"
+                echo "  [DRY RUN] python3 plot_noise_comparison_charts.py -r $RESULTS_DIR -n $noise -o $CHART_DIR/noise${noise}_by_nodes.png"
             done
         else
             cd "$COMPARISON_DIR"
@@ -665,7 +672,7 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
             for noise in 90 70 50; do
                 packet_loss=$((100 - noise))
                 print_info "Generating noise chart (${packet_loss}% packet loss)"
-                python3 plot_noise_comparison_charts.py -n "$noise" -o "$CHART_DIR/noise${noise}_by_nodes.png" || {
+                python3 plot_noise_comparison_charts.py -r "$RESULTS_DIR" -n "$noise" -o "$CHART_DIR/noise${noise}_by_nodes.png" || {
                     print_warn "Failed to generate noise chart for $noise%"
                 }
             done
@@ -677,12 +684,12 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         print_section "Network Partition Charts"
 
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] python3 plot_partition_comparison_charts.py -o $CHART_DIR/partition_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_partition_comparison_charts.py -r $RESULTS_DIR -o $CHART_DIR/partition_by_nodes.png"
         else
             cd "$COMPARISON_DIR"
 
             print_info "Generating partition comparison (2x2 grid)"
-            python3 plot_partition_comparison_charts.py -o "$CHART_DIR/partition_by_nodes.png" || {
+            python3 plot_partition_comparison_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR/partition_by_nodes.png" || {
                 print_warn "Failed to generate partition chart"
             }
         fi
@@ -692,13 +699,13 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
     print_section "Cross-Algorithm Comparison"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY RUN] python3 compare_algorithms.py -o $CHART_DIR/cross_algorithm/"
+        echo "  [DRY RUN] python3 compare_algorithms.py -r $RESULTS_DIR -o $CHART_DIR/cross_algorithm/"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "compare_algorithms.py" ]]; then
             print_info "Generating cross-algorithm comparison plots"
-            python3 compare_algorithms.py -o "$CHART_DIR/cross_algorithm/" || {
+            python3 compare_algorithms.py -r "$RESULTS_DIR" -o "$CHART_DIR/cross_algorithm/" || {
                 print_warn "Failed to generate cross-algorithm charts"
             }
         fi
@@ -708,13 +715,13 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
     print_section "Per-Algorithm Metrics Charts"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -o $CHART_DIR/per_algorithm/"
+        echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -r $RESULTS_DIR -o $CHART_DIR/per_algorithm/"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "plot_per_algorithm_charts.py" ]]; then
             print_info "Generating per-algorithm metrics and scalability charts"
-            python3 plot_per_algorithm_charts.py -o "$CHART_DIR/per_algorithm/" || {
+            python3 plot_per_algorithm_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR/per_algorithm/" || {
                 print_warn "Failed to generate per-algorithm charts"
             }
         fi
@@ -724,13 +731,13 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
     print_section "Messages vs Convergence Trade-off Charts"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -o $CHART_DIR/messages_vs_convergence.png"
+        echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -r $RESULTS_DIR -o $CHART_DIR/messages_vs_convergence.png"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "plot_messages_vs_convergence.py" ]]; then
             print_info "Generating messages vs convergence time trade-off charts"
-            python3 plot_messages_vs_convergence.py -o "$CHART_DIR/messages_vs_convergence.png" || {
+            python3 plot_messages_vs_convergence.py -r "$RESULTS_DIR" -o "$CHART_DIR/messages_vs_convergence.png" || {
                 print_warn "Failed to generate messages vs convergence charts"
             }
         fi

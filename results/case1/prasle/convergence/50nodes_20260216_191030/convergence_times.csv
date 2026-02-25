@@ -1,0 +1,11 @@
+trial,algorithm,node_count,convergence_time_ms
+3,prasle,50,3027
+2,prasle,50,2985
+4,prasle,50,2803
+7,prasle,50,3131
+1,prasle,50,2821
+6,prasle,50,2764
+8,prasle,50,2982
+5,prasle,50,2830
+9,prasle,50,2953
+10,prasle,50,2767

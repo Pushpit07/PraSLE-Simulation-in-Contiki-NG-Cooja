@@ -1,0 +1,11 @@
+trial,algorithm,node_count,convergence_time_ms
+1,adaptive-prasle-mesh,50,1564
+8,adaptive-prasle-mesh,50,1511
+4,adaptive-prasle-mesh,50,1614
+3,adaptive-prasle-mesh,50,1659
+7,adaptive-prasle-mesh,50,1505
+5,adaptive-prasle-mesh,50,1762
+6,adaptive-prasle-mesh,50,1561
+10,adaptive-prasle-mesh,50,1454
+2,adaptive-prasle-mesh,50,1722
+9,adaptive-prasle-mesh,50,1549

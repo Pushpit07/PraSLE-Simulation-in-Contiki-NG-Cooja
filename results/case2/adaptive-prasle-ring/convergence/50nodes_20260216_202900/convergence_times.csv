@@ -1,0 +1,11 @@
+trial,algorithm,node_count,convergence_time_ms
+4,adaptive-prasle-ring,50,1547
+5,adaptive-prasle-ring,50,1544
+8,adaptive-prasle-ring,50,1549
+10,adaptive-prasle-ring,50,1570
+1,adaptive-prasle-ring,50,1650
+9,adaptive-prasle-ring,50,1673
+6,adaptive-prasle-ring,50,1687
+2,adaptive-prasle-ring,50,1577
+7,adaptive-prasle-ring,50,1566
+3,adaptive-prasle-ring,50,1594
