@@ -373,9 +373,9 @@
 #define TIMEOUT_MAX_SECONDS        5.0
 #endif
 
-/* EWMA smoothing factor (0.0-1.0, higher = more weight to old estimate) */
+/* EWMA smoothing factor for Jacobson RTT estimation (α = 1/8 = 0.125) */
 #ifndef TIMEOUT_ALPHA
-#define TIMEOUT_ALPHA             0.75   /* Faster RTT convergence */
+#define TIMEOUT_ALPHA             0.125  /* Classic Jacobson formula: α = 1/8 */
 #endif
 
 /* Safety margin multiplier for timeout calculation - reduced for faster convergence */

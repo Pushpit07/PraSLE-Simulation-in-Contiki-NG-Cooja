@@ -599,10 +599,14 @@ fi
 if [[ "$SKIP_CHARTS" != "true" ]]; then
     print_header "Generating Comparison Charts"
 
-    CHART_DIR="$PROJECT_DIR/results/case${PARAM_CASE}/comparison_charts"
+    # Create two chart directories: auto-scale and same-scale
+    CHART_DIR_BASE="$PROJECT_DIR/results/case${PARAM_CASE}/comparison_charts"
+    CHART_DIR_AUTO="$CHART_DIR_BASE/auto-scale"
+    CHART_DIR_SAME="$CHART_DIR_BASE/same-scale"
 
     if [[ "$DRY_RUN" != "true" ]]; then
-        mkdir -p "$CHART_DIR"
+        mkdir -p "$CHART_DIR_AUTO"
+        mkdir -p "$CHART_DIR_SAME"
     fi
 
     COMPARISON_DIR="$SCRIPT_DIR/comparison"
@@ -619,19 +623,29 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         print_section "Convergence Charts"
 
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m convergence -o $CHART_DIR/convergence_by_nodes.png"
-            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m messages -o $CHART_DIR/messages_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m convergence -o $CHART_DIR_AUTO/convergence_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m convergence --same-scale -o $CHART_DIR_SAME/convergence_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m messages -o $CHART_DIR_AUTO/messages_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_node_comparison_charts.py -r $RESULTS_DIR -m messages --same-scale -o $CHART_DIR_SAME/messages_by_nodes.png"
         else
             cd "$COMPARISON_DIR"
 
-            print_info "Generating convergence time comparison (2x2 grid)"
-            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m convergence -o "$CHART_DIR/convergence_by_nodes.png" || {
-                print_warn "Failed to generate convergence chart"
+            print_info "Generating convergence time comparison (auto-scale)"
+            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m convergence -o "$CHART_DIR_AUTO/convergence_by_nodes.png" || {
+                print_warn "Failed to generate convergence chart (auto-scale)"
+            }
+            print_info "Generating convergence time comparison (same-scale)"
+            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m convergence --same-scale -o "$CHART_DIR_SAME/convergence_by_nodes.png" || {
+                print_warn "Failed to generate convergence chart (same-scale)"
             }
 
-            print_info "Generating message overhead comparison (2x2 grid)"
-            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m messages -o "$CHART_DIR/messages_by_nodes.png" || {
-                print_warn "Failed to generate messages chart"
+            print_info "Generating message overhead comparison (auto-scale)"
+            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m messages -o "$CHART_DIR_AUTO/messages_by_nodes.png" || {
+                print_warn "Failed to generate messages chart (auto-scale)"
+            }
+            print_info "Generating message overhead comparison (same-scale)"
+            python3 plot_node_comparison_charts.py -r "$RESULTS_DIR" -m messages --same-scale -o "$CHART_DIR_SAME/messages_by_nodes.png" || {
+                print_warn "Failed to generate messages chart (same-scale)"
             }
         fi
     fi
@@ -641,19 +655,29 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         print_section "Fault Tolerance Charts"
 
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR -o $CHART_DIR/recovery_by_nodes.png"
-            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR --grid-3x2 -o $CHART_DIR/recovery_4x3_grid.png"
+            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/recovery_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR --same-scale -o $CHART_DIR_SAME/recovery_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR --grid-3x2 -o $CHART_DIR_AUTO/recovery_4x3_grid.png"
+            echo "  [DRY RUN] python3 plot_recovery_comparison_charts.py -r $RESULTS_DIR --grid-3x2 --same-scale -o $CHART_DIR_SAME/recovery_4x3_grid.png"
         else
             cd "$COMPARISON_DIR"
 
-            print_info "Generating recovery time comparison (2x2 grid)"
-            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR/recovery_by_nodes.png" || {
-                print_warn "Failed to generate recovery chart"
+            print_info "Generating recovery time comparison 2x2 (auto-scale)"
+            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/recovery_by_nodes.png" || {
+                print_warn "Failed to generate recovery chart (auto-scale)"
+            }
+            print_info "Generating recovery time comparison 2x2 (same-scale)"
+            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" --same-scale -o "$CHART_DIR_SAME/recovery_by_nodes.png" || {
+                print_warn "Failed to generate recovery chart (same-scale)"
             }
 
-            print_info "Generating recovery time comparison (4x3 grid)"
-            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" --grid-3x2 -o "$CHART_DIR/recovery_4x3_grid.png" || {
-                print_warn "Failed to generate recovery 4x3 grid chart"
+            print_info "Generating recovery time comparison 4x3 (auto-scale)"
+            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" --grid-3x2 -o "$CHART_DIR_AUTO/recovery_4x3_grid.png" || {
+                print_warn "Failed to generate recovery 4x3 grid chart (auto-scale)"
+            }
+            print_info "Generating recovery time comparison 4x3 (same-scale)"
+            python3 plot_recovery_comparison_charts.py -r "$RESULTS_DIR" --grid-3x2 --same-scale -o "$CHART_DIR_SAME/recovery_4x3_grid.png" || {
+                print_warn "Failed to generate recovery 4x3 grid chart (same-scale)"
             }
         fi
     fi
@@ -664,16 +688,21 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
 
         if [[ "$DRY_RUN" == "true" ]]; then
             for noise in 90 70 50; do
-                echo "  [DRY RUN] python3 plot_noise_comparison_charts.py -r $RESULTS_DIR -n $noise -o $CHART_DIR/noise${noise}_by_nodes.png"
+                echo "  [DRY RUN] python3 plot_noise_comparison_charts.py -r $RESULTS_DIR -n $noise -o $CHART_DIR_AUTO/noise${noise}_by_nodes.png"
+                echo "  [DRY RUN] python3 plot_noise_comparison_charts.py -r $RESULTS_DIR -n $noise --same-scale -o $CHART_DIR_SAME/noise${noise}_by_nodes.png"
             done
         else
             cd "$COMPARISON_DIR"
 
             for noise in 90 70 50; do
                 packet_loss=$((100 - noise))
-                print_info "Generating noise chart (${packet_loss}% packet loss)"
-                python3 plot_noise_comparison_charts.py -r "$RESULTS_DIR" -n "$noise" -o "$CHART_DIR/noise${noise}_by_nodes.png" || {
-                    print_warn "Failed to generate noise chart for $noise%"
+                print_info "Generating noise chart ${packet_loss}% loss (auto-scale)"
+                python3 plot_noise_comparison_charts.py -r "$RESULTS_DIR" -n "$noise" -o "$CHART_DIR_AUTO/noise${noise}_by_nodes.png" || {
+                    print_warn "Failed to generate noise chart for $noise% (auto-scale)"
+                }
+                print_info "Generating noise chart ${packet_loss}% loss (same-scale)"
+                python3 plot_noise_comparison_charts.py -r "$RESULTS_DIR" -n "$noise" --same-scale -o "$CHART_DIR_SAME/noise${noise}_by_nodes.png" || {
+                    print_warn "Failed to generate noise chart for $noise% (same-scale)"
                 }
             done
         fi
@@ -684,66 +713,76 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
         print_section "Network Partition Charts"
 
         if [[ "$DRY_RUN" == "true" ]]; then
-            echo "  [DRY RUN] python3 plot_partition_comparison_charts.py -r $RESULTS_DIR -o $CHART_DIR/partition_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_partition_comparison_charts.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/partition_by_nodes.png"
+            echo "  [DRY RUN] python3 plot_partition_comparison_charts.py -r $RESULTS_DIR --same-scale -o $CHART_DIR_SAME/partition_by_nodes.png"
         else
             cd "$COMPARISON_DIR"
 
-            print_info "Generating partition comparison (2x2 grid)"
-            python3 plot_partition_comparison_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR/partition_by_nodes.png" || {
-                print_warn "Failed to generate partition chart"
+            print_info "Generating partition comparison (auto-scale)"
+            python3 plot_partition_comparison_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/partition_by_nodes.png" || {
+                print_warn "Failed to generate partition chart (auto-scale)"
+            }
+            print_info "Generating partition comparison (same-scale)"
+            python3 plot_partition_comparison_charts.py -r "$RESULTS_DIR" --same-scale -o "$CHART_DIR_SAME/partition_by_nodes.png" || {
+                print_warn "Failed to generate partition chart (same-scale)"
             }
         fi
     fi
 
     # Generate cross-algorithm comparison (existing script)
+    # Note: This script doesn't support --same-scale, so only generated in auto-scale directory
     print_section "Cross-Algorithm Comparison"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY RUN] python3 compare_algorithms.py -r $RESULTS_DIR -o $CHART_DIR/cross_algorithm/"
+        echo "  [DRY RUN] python3 compare_algorithms.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/cross_algorithm/"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "compare_algorithms.py" ]]; then
             print_info "Generating cross-algorithm comparison plots"
-            python3 compare_algorithms.py -r "$RESULTS_DIR" -o "$CHART_DIR/cross_algorithm/" || {
+            python3 compare_algorithms.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/cross_algorithm/" || {
                 print_warn "Failed to generate cross-algorithm charts"
             }
         fi
     fi
 
     # Generate per-algorithm charts (metrics and scalability for each algorithm)
+    # Note: This script doesn't support --same-scale, so only generated in auto-scale directory
     print_section "Per-Algorithm Metrics Charts"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -r $RESULTS_DIR -o $CHART_DIR/per_algorithm/"
+        echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/per_algorithm/"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "plot_per_algorithm_charts.py" ]]; then
             print_info "Generating per-algorithm metrics and scalability charts"
-            python3 plot_per_algorithm_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR/per_algorithm/" || {
+            python3 plot_per_algorithm_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/per_algorithm/" || {
                 print_warn "Failed to generate per-algorithm charts"
             }
         fi
     fi
 
     # Generate messages vs convergence time trade-off chart
+    # Note: This script doesn't support --same-scale, so only generated in auto-scale directory
     print_section "Messages vs Convergence Trade-off Charts"
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -r $RESULTS_DIR -o $CHART_DIR/messages_vs_convergence.png"
+        echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/messages_vs_convergence.png"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "plot_messages_vs_convergence.py" ]]; then
             print_info "Generating messages vs convergence time trade-off charts"
-            python3 plot_messages_vs_convergence.py -r "$RESULTS_DIR" -o "$CHART_DIR/messages_vs_convergence.png" || {
+            python3 plot_messages_vs_convergence.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/messages_vs_convergence.png" || {
                 print_warn "Failed to generate messages vs convergence charts"
             }
         fi
     fi
 
-    print_info "Charts saved to: $CHART_DIR"
+    print_info "Charts saved to:"
+    print_info "  Auto-scale: $CHART_DIR_AUTO"
+    print_info "  Same-scale: $CHART_DIR_SAME"
 fi
 
 # ============================================================
@@ -767,20 +806,28 @@ if [[ "$SKIP_EXPERIMENTS" != "true" && "$DRY_RUN" != "true" ]]; then
 fi
 
 if [[ "$SKIP_CHARTS" != "true" && "$DRY_RUN" != "true" ]]; then
+    CHART_BASE="$PROJECT_DIR/results/case${PARAM_CASE}/comparison_charts"
     echo "Charts saved to:"
-    echo "  $PROJECT_DIR/results/comparison_charts/"
+    echo "  $CHART_BASE/"
     echo ""
-    echo "Generated chart files:"
-    if [[ -d "$PROJECT_DIR/results/comparison_charts" ]]; then
-        ls -1 "$PROJECT_DIR/results/comparison_charts/"*.png 2>/dev/null | while read f; do
-            echo "  - $(basename "$f")"
+    echo "Auto-scale charts (independent y-axis per subplot):"
+    if [[ -d "$CHART_BASE/auto-scale" ]]; then
+        ls -1 "$CHART_BASE/auto-scale/"*.png 2>/dev/null | while read f; do
+            echo "  - auto-scale/$(basename "$f")"
+        done
+    fi
+    echo ""
+    echo "Same-scale charts (uniform y-axis across subplots):"
+    if [[ -d "$CHART_BASE/same-scale" ]]; then
+        ls -1 "$CHART_BASE/same-scale/"*.png 2>/dev/null | while read f; do
+            echo "  - same-scale/$(basename "$f")"
         done
     fi
     echo ""
     echo "Per-algorithm charts:"
-    if [[ -d "$PROJECT_DIR/results/comparison_charts/per_algorithm" ]]; then
-        ls -1 "$PROJECT_DIR/results/comparison_charts/per_algorithm/"*.png 2>/dev/null | while read f; do
-            echo "  - per_algorithm/$(basename "$f")"
+    if [[ -d "$CHART_BASE/auto-scale/per_algorithm" ]]; then
+        ls -1 "$CHART_BASE/auto-scale/per_algorithm/"*.png 2>/dev/null | while read f; do
+            echo "  - auto-scale/per_algorithm/$(basename "$f")"
         done
     fi
 fi

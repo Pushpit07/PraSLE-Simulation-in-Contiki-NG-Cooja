@@ -285,8 +285,13 @@ def create_legend_handles():
 
 
 def create_combined_figure(results_dir: Path, output_path: Path, noise_level: int,
-                          metric: str = 'convergence', dpi: int = 300, format: str = 'png'):
-    """Create a 2x2 figure with all 4 node count charts."""
+                          metric: str = 'convergence', dpi: int = 300, format: str = 'png',
+                          same_scale: bool = False):
+    """Create a 2x2 figure with all 4 node count charts.
+
+    Args:
+        same_scale: If True, all subplots use the same y-axis scale
+    """
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
     packet_loss = 100 - noise_level
@@ -300,6 +305,12 @@ def create_combined_figure(results_dir: Path, output_path: Path, noise_level: in
     for idx, node_count in enumerate(NODE_COUNTS):
         has_data = plot_single_chart(axes_flat[idx], results_dir, node_count, noise_level, metric)
         any_data = any_data or has_data
+
+    # Apply same y-axis scale across all subplots if requested
+    if same_scale and any_data:
+        max_ylim = max(ax.get_ylim()[1] for ax in axes_flat)
+        for ax in axes_flat:
+            ax.set_ylim(0, max_ylim)
 
     handles = create_legend_handles()
     fig.legend(handles=handles, loc='lower center', ncol=5,
@@ -422,6 +433,8 @@ Examples:
                         help='Output format (default: png)')
     parser.add_argument('--summary', action='store_true',
                         help='Print data summary table')
+    parser.add_argument('--same-scale', action='store_true',
+                        help='Use same y-axis scale across all subplots for easier comparison')
 
     args = parser.parse_args()
 
@@ -463,7 +476,7 @@ Examples:
         if not output_path.is_absolute():
             output_path = script_dir / output_path
         create_combined_figure(results_dir, output_path, args.noise_level,
-                              args.metric, args.dpi, args.format)
+                              args.metric, args.dpi, args.format, args.same_scale)
 
     print("\nDone!")
 
