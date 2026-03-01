@@ -730,52 +730,70 @@ if [[ "$SKIP_CHARTS" != "true" ]]; then
     fi
 
     # Generate cross-algorithm comparison (existing script)
-    # Note: This script doesn't support --same-scale, so only generated in auto-scale directory
+    # Note: These are single-plot charts (not subplot grids), so same-scale doesn't apply.
+    # We generate in both directories for completeness.
     print_section "Cross-Algorithm Comparison"
 
     if [[ "$DRY_RUN" == "true" ]]; then
         echo "  [DRY RUN] python3 compare_algorithms.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/cross_algorithm/"
+        echo "  [DRY RUN] python3 compare_algorithms.py -r $RESULTS_DIR -o $CHART_DIR_SAME/cross_algorithm/"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "compare_algorithms.py" ]]; then
-            print_info "Generating cross-algorithm comparison plots"
+            print_info "Generating cross-algorithm comparison plots (auto-scale)"
             python3 compare_algorithms.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/cross_algorithm/" || {
-                print_warn "Failed to generate cross-algorithm charts"
+                print_warn "Failed to generate cross-algorithm charts (auto-scale)"
+            }
+            print_info "Generating cross-algorithm comparison plots (same-scale)"
+            python3 compare_algorithms.py -r "$RESULTS_DIR" -o "$CHART_DIR_SAME/cross_algorithm/" || {
+                print_warn "Failed to generate cross-algorithm charts (same-scale)"
             }
         fi
     fi
 
     # Generate per-algorithm charts (metrics and scalability for each algorithm)
-    # Note: This script doesn't support --same-scale, so only generated in auto-scale directory
+    # Note: These are single-plot charts (not subplot grids), so same-scale doesn't apply.
+    # We generate in both directories for completeness.
     print_section "Per-Algorithm Metrics Charts"
 
     if [[ "$DRY_RUN" == "true" ]]; then
         echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/per_algorithm/"
+        echo "  [DRY RUN] python3 plot_per_algorithm_charts.py -r $RESULTS_DIR -o $CHART_DIR_SAME/per_algorithm/"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "plot_per_algorithm_charts.py" ]]; then
-            print_info "Generating per-algorithm metrics and scalability charts"
+            print_info "Generating per-algorithm metrics and scalability charts (auto-scale)"
             python3 plot_per_algorithm_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/per_algorithm/" || {
-                print_warn "Failed to generate per-algorithm charts"
+                print_warn "Failed to generate per-algorithm charts (auto-scale)"
+            }
+            print_info "Generating per-algorithm metrics and scalability charts (same-scale)"
+            python3 plot_per_algorithm_charts.py -r "$RESULTS_DIR" -o "$CHART_DIR_SAME/per_algorithm/" || {
+                print_warn "Failed to generate per-algorithm charts (same-scale)"
             }
         fi
     fi
 
     # Generate messages vs convergence time trade-off chart
-    # Note: This script doesn't support --same-scale, so only generated in auto-scale directory
+    # Note: These are single-plot charts (not subplot grids), so same-scale doesn't apply.
+    # We generate in both directories for completeness.
     print_section "Messages vs Convergence Trade-off Charts"
 
     if [[ "$DRY_RUN" == "true" ]]; then
         echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -r $RESULTS_DIR -o $CHART_DIR_AUTO/messages_vs_convergence.png"
+        echo "  [DRY RUN] python3 plot_messages_vs_convergence.py -r $RESULTS_DIR -o $CHART_DIR_SAME/messages_vs_convergence.png"
     else
         cd "$COMPARISON_DIR"
 
         if [[ -f "plot_messages_vs_convergence.py" ]]; then
-            print_info "Generating messages vs convergence time trade-off charts"
+            print_info "Generating messages vs convergence trade-off (auto-scale)"
             python3 plot_messages_vs_convergence.py -r "$RESULTS_DIR" -o "$CHART_DIR_AUTO/messages_vs_convergence.png" || {
-                print_warn "Failed to generate messages vs convergence charts"
+                print_warn "Failed to generate messages vs convergence chart (auto-scale)"
+            }
+            print_info "Generating messages vs convergence trade-off (same-scale)"
+            python3 plot_messages_vs_convergence.py -r "$RESULTS_DIR" -o "$CHART_DIR_SAME/messages_vs_convergence.png" || {
+                print_warn "Failed to generate messages vs convergence chart (same-scale)"
             }
         fi
     fi
@@ -824,10 +842,27 @@ if [[ "$SKIP_CHARTS" != "true" && "$DRY_RUN" != "true" ]]; then
         done
     fi
     echo ""
+    echo "Cross-algorithm charts:"
+    if [[ -d "$CHART_BASE/auto-scale/cross_algorithm" ]]; then
+        ls -1 "$CHART_BASE/auto-scale/cross_algorithm/"*.png 2>/dev/null | while read f; do
+            echo "  - auto-scale/cross_algorithm/$(basename "$f")"
+        done
+    fi
+    if [[ -d "$CHART_BASE/same-scale/cross_algorithm" ]]; then
+        ls -1 "$CHART_BASE/same-scale/cross_algorithm/"*.png 2>/dev/null | while read f; do
+            echo "  - same-scale/cross_algorithm/$(basename "$f")"
+        done
+    fi
+    echo ""
     echo "Per-algorithm charts:"
     if [[ -d "$CHART_BASE/auto-scale/per_algorithm" ]]; then
         ls -1 "$CHART_BASE/auto-scale/per_algorithm/"*.png 2>/dev/null | while read f; do
             echo "  - auto-scale/per_algorithm/$(basename "$f")"
+        done
+    fi
+    if [[ -d "$CHART_BASE/same-scale/per_algorithm" ]]; then
+        ls -1 "$CHART_BASE/same-scale/per_algorithm/"*.png 2>/dev/null | while read f; do
+            echo "  - same-scale/per_algorithm/$(basename "$f")"
         done
     fi
 fi
