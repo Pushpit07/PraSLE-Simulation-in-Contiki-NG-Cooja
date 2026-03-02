@@ -406,7 +406,6 @@ Can be overridden via Makefile: `make PRASLE_K_ROUNDS=5`
 | MSG_HEARTBEAT | 1 | Leader liveness signal | 14 bytes |
 | MSG_HANDOVER_REQ | 2 | Initiate leader rotation | 8 bytes |
 | MSG_HANDOVER_ACK | 3 | Confirm handover acceptance | 8 bytes |
-| MSG_BACKUP_UPDATE | 4 | Broadcast backup list | Variable |
 
 ## State Machine
 

@@ -442,7 +442,6 @@ typedef enum {
   MSG_HEARTBEAT = 1,       /* Leader heartbeat */
   MSG_HANDOVER_REQ = 2,    /* Leader handover request */
   MSG_HANDOVER_ACK = 3,    /* Handover acknowledgement */
-  MSG_BACKUP_UPDATE = 4,   /* Backup list update broadcast */
 } adaptive_msg_type_t;
 
 /*===========================================================================*/
