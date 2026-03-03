@@ -1,0 +1,11 @@
+trial,algorithm,node_count,partition_a_convergence_ms,partition_b_convergence_ms,partition_a_leader,partition_b_leader,split_brain
+1,prasle-ring,10,3363,3051,1,6,true
+2,prasle-ring,10,2964,3168,1,6,true
+3,prasle-ring,10,3236,3093,1,6,true
+4,prasle-ring,10,2884,3354,1,6,true
+5,prasle-ring,10,3420,2861,1,6,true
+6,prasle-ring,10,2786,3503,1,6,true
+7,prasle-ring,10,3159,3427,1,6,true
+8,prasle-ring,10,3486,2946,1,6,true
+9,prasle-ring,10,3413,3094,1,6,true
+10,prasle-ring,10,3689,3131,1,6,true

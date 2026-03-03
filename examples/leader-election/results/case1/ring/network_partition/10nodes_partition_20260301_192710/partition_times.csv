@@ -1,0 +1,11 @@
+trial,algorithm,node_count,partition_a_convergence_ms,partition_b_convergence_ms,partition_a_leader,partition_b_leader,split_brain
+1,ring,10,13442,13538,3,8,true
+2,ring,10,12566,13057,3,8,true
+3,ring,10,12489,NA,3,10,true
+4,ring,10,12392,12851,3,8,true
+5,ring,10,13559,13174,3,8,true
+6,ring,10,13455,13311,3,8,true
+7,ring,10,13678,12798,3,8,true
+8,ring,10,NA,NA,5,10,true
+9,ring,10,NA,13132,5,8,true
+10,ring,10,NA,NA,5,10,true
