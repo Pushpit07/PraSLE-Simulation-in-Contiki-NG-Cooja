@@ -428,8 +428,14 @@ PROCESS_THREAD(prasle_process, ev, data)
     metrics_output_header();
   #endif
 
-  /* Random startup delay to desynchronize nodes (matching Bully/Ring pattern) */
+  /* Random startup delay to desynchronize nodes */
+#ifdef STANDARDIZED_PARAMS
+  /* Use same formula as Bully/Ring for fair cross-algorithm comparison */
+  etimer_set(&round_timer, random_rand() % PRASLE_STARTUP_DELAY_MAX);
+#else
+  /* Offset formula: guarantees minimum delay for RPL establishment */
   etimer_set(&round_timer, (random_rand() % PRASLE_STARTUP_DELAY_MAX) + (PRASLE_STARTUP_DELAY_MAX / 2));
+#endif
   PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&round_timer));
 
   start_time = clock_time();
