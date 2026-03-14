@@ -1,0 +1,11 @@
+trial,algorithm,node_count,crash_time_s,initial_convergence_time_ms,recovery_convergence_time_ms,total_recovery_time_ms
+1,prasle-ring,50,80,2811,80040,40
+2,prasle-ring,50,80,2740,80069,69
+3,prasle-ring,50,80,2871,80036,36
+4,prasle-ring,50,80,2996,80018,18
+5,prasle-ring,50,80,2812,80112,112
+6,prasle-ring,50,80,2800,80028,28
+7,prasle-ring,50,80,2806,80023,23
+8,prasle-ring,50,80,2797,80012,12
+9,prasle-ring,50,80,2937,80096,96
+10,prasle-ring,50,80,2776,80009,9

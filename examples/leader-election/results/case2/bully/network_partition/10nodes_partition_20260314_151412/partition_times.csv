@@ -1,0 +1,11 @@
+trial,algorithm,node_count,partition_a_convergence_ms,partition_b_convergence_ms,partition_a_leader,partition_b_leader,split_brain
+1,bully,10,4523,5932,5,10,true
+2,bully,10,6098,4334,5,10,true
+3,bully,10,5219,4452,5,10,true
+4,bully,10,6239,4954,5,10,true
+5,bully,10,4908,4272,5,10,true
+6,bully,10,5107,6187,5,10,true
+7,bully,10,4865,5533,5,10,true
+8,bully,10,5718,4404,5,10,true
+9,bully,10,5443,6058,5,10,true
+10,bully,10,5359,5793,5,10,true

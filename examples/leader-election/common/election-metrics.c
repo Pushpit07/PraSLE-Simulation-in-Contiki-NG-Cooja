@@ -7,6 +7,7 @@
 
 #include "election-metrics.h"
 #include "sys/node-id.h"
+#include "sys/energest.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -116,9 +117,23 @@ metrics_output(void)
          (unsigned long)metrics.heartbeats_sent,
          (unsigned long)metrics.heartbeats_received);
 
-  printf("%s,%d",
+  printf("%s,%d,",
          election_state_name(metrics.current_state),
          metrics.am_leader ? 1 : 0);
+
+  /* Output Energest metrics */
+#if ENERGEST_CONF_ON
+  energest_flush();
+  metrics.energest_cpu = (uint32_t)energest_type_time(ENERGEST_TYPE_CPU);
+  metrics.energest_lpm = (uint32_t)energest_type_time(ENERGEST_TYPE_LPM);
+  metrics.energest_tx = (uint32_t)energest_type_time(ENERGEST_TYPE_TRANSMIT);
+  metrics.energest_rx = (uint32_t)energest_type_time(ENERGEST_TYPE_LISTEN);
+#endif
+  printf("%lu,%lu,%lu,%lu",
+         (unsigned long)metrics.energest_cpu,
+         (unsigned long)metrics.energest_lpm,
+         (unsigned long)metrics.energest_tx,
+         (unsigned long)metrics.energest_rx);
 
   /* Output algorithm-specific metrics */
 #if CURRENT_ALGORITHM == ALGORITHM_BULLY

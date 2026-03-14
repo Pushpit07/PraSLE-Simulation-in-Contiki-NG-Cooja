@@ -1,0 +1,11 @@
+trial,algorithm,node_count,noise_level,convergence_time_ms,message_count
+1,bully,50,50,4292,NA
+2,bully,50,50,4179,NA
+3,bully,50,50,4323,NA
+4,bully,50,50,4106,NA
+5,bully,50,50,4129,NA
+6,bully,50,50,4537,NA
+7,bully,50,50,4497,NA
+8,bully,50,50,4650,NA
+9,bully,50,50,4245,NA
+10,bully,50,50,4238,NA

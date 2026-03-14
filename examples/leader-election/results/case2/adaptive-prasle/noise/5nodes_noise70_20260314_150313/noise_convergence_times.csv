@@ -1,0 +1,11 @@
+trial,algorithm,node_count,noise_level,convergence_time_ms,message_count
+1,adaptive-prasle,5,70,1839,NA
+2,adaptive-prasle,5,70,2547,NA
+3,adaptive-prasle,5,70,2220,NA
+4,adaptive-prasle,5,70,1998,NA
+5,adaptive-prasle,5,70,2243,NA
+6,adaptive-prasle,5,70,2341,NA
+7,adaptive-prasle,5,70,2162,NA
+8,adaptive-prasle,5,70,1874,NA
+9,adaptive-prasle,5,70,1717,NA
+10,adaptive-prasle,5,70,2335,NA

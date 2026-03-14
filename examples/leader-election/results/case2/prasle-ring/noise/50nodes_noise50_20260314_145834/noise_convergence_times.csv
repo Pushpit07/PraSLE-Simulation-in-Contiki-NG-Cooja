@@ -1,0 +1,11 @@
+trial,algorithm,node_count,noise_level,convergence_time_ms,message_count
+1,prasle-ring,50,50,3009,NA
+2,prasle-ring,50,50,2787,NA
+3,prasle-ring,50,50,2841,NA
+4,prasle-ring,50,50,2769,NA
+5,prasle-ring,50,50,2866,NA
+6,prasle-ring,50,50,2741,NA
+7,prasle-ring,50,50,2812,NA
+8,prasle-ring,50,50,2995,NA
+9,prasle-ring,50,50,2911,NA
+10,prasle-ring,50,50,2787,NA

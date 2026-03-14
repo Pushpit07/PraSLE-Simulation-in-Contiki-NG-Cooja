@@ -1,0 +1,11 @@
+trial,algorithm,node_count,crash_time_s,initial_convergence_time_ms,recovery_convergence_time_ms,total_recovery_time_ms
+1,ring,10,60,1716,72051,12051
+2,ring,10,60,1798,NA,NA
+3,ring,10,60,2644,70970,10970
+4,ring,10,60,1765,72170,12170
+5,ring,10,60,1391,71735,11735
+6,ring,10,60,1638,71930,11930
+7,ring,10,60,1314,NA,NA
+8,ring,10,60,1873,72225,12225
+9,ring,10,60,2196,70580,10580
+10,ring,10,60,1926,72249,12249

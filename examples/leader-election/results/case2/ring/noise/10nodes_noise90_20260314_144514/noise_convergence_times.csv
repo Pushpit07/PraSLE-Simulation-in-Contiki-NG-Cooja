@@ -1,0 +1,11 @@
+trial,algorithm,node_count,noise_level,convergence_time_ms,message_count
+1,ring,10,90,2574,NA
+2,ring,10,90,3436,NA
+3,ring,10,90,2201,NA
+4,ring,10,90,3258,NA
+5,ring,10,90,55191,NA
+6,ring,10,90,1638,NA
+7,ring,10,90,2087,NA
+8,ring,10,90,3657,NA
+9,ring,10,90,1735,NA
+10,ring,10,90,NA,NA

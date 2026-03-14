@@ -71,6 +71,12 @@ typedef struct {
   uint32_t heartbeats_received;        /* Alive/heartbeat messages received */
   uint32_t heartbeats_sent;            /* Alive/heartbeat messages sent */
 
+  /* Energy Metrics (from Energest, cumulative ticks) */
+  uint32_t energest_cpu;               /* CPU active ticks */
+  uint32_t energest_lpm;               /* Low-power mode ticks */
+  uint32_t energest_tx;                /* Radio TX ticks */
+  uint32_t energest_rx;                /* Radio RX ticks */
+
   /* ========== Algorithm-Specific Metrics ========== */
   /* Stored in a union to save memory - access based on CURRENT_ALGORITHM */
 
@@ -228,7 +234,8 @@ void metrics_track_heartbeat_recv(void);
   "bytes_sent,bytes_received,leader_changes,current_leader," \
   "time_in_normal_ms,time_in_election_ms,time_in_waiting_ms," \
   "state_transitions,timeouts_detected,heartbeats_sent,heartbeats_received," \
-  "current_state,am_leader"
+  "current_state,am_leader," \
+  "energest_cpu,energest_lpm,energest_tx,energest_rx"
 
 /* Bully-specific header columns */
 #define METRICS_CSV_HEADER_BULLY \
